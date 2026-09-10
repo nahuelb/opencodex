@@ -2509,8 +2509,8 @@ export function createResponsesPassthroughAdapter(provider: OcxProviderConfig): 
         if (effortResult.baseline && effortResult.effective) {
           astraReasoningLog = { effectiveEffort: effortResult.effective, wireField: "reasoning.effort", wireValue: effortResult.baseline };
         }
-        console.info("[ocx:astra-effort-cache]", JSON.stringify({ status: effortResult.status,
-          baseline: effortResult.baseline, effective: effortResult.effective }));
+        debugProviderDiagnostic("openai-responses", "astra-effort-cache", { status: effortResult.status,
+          baseline: effortResult.baseline, effective: effortResult.effective });
       }
       if (isCanonicalOpenAiForwardProvider(provider)) {
         const routingHeaders = new Headers(headers);
