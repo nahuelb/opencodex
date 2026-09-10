@@ -1132,5 +1132,6 @@
   "zhipu-bigmodel-provider.test.ts": "providers",
   "zz-ci-api-usage-isolation.test.ts": "ci-workflows",
   "zz-ci-storage-policy-isolation.test.ts": "ci-workflows",
-  "zz-pr-coderabbit-readiness-revalidation.test.ts": "ci-workflows"
+  "zz-pr-coderabbit-readiness-revalidation.test.ts": "ci-workflows",
+  "codex-side-chat-cache.test.ts": "codex-integration"
 }

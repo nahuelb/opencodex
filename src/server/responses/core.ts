@@ -1,3 +1,4 @@
+import { completeSideChatCache } from "../../codex/side-chat-cache";
 import type { Server } from "bun";
 import { randomUUID } from "node:crypto";
 import { bridgeToResponsesSSE, buildResponseJSON, formatErrorResponse, type ResponsesTerminalStatus } from "../../bridge";
@@ -4625,6 +4626,7 @@ async function handleResponsesInner(
         ) {
           return;
         }
+        completeSideChatCache(request, restoredResponse);
         rememberPassthroughResponse(restoredResponse);
       }
       : undefined;
