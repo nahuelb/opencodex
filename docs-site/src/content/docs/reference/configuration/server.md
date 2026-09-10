@@ -490,9 +490,10 @@ and token counts. They contain no prompts, credentials, or raw account/task IDs.
 A new Desktop Luna side chat reused 29,440 of 31,782 input tokens on its first
 request in local validation. Provider caching remains opportunistic and can miss.
 
-## Experimental Astra effort cache preservation
+## Astra effort cache preservation
 
-Set `OCX_ASTRA_EFFORT_CACHE=1` in the proxy process environment to opt in. The default is disabled.
+Effort cache preservation runs automatically for supported requests. There is no enable/disable
+setting and no configuration is required.
 This applies only to `gpt-6-astra` on the canonical ChatGPT Codex forward destination in standard,
 single-agent mode. It does not enable the feature for Luna, Pro, public API destinations, or custom gateways.
 
@@ -506,7 +507,7 @@ The caller must supply a distinct conversation identity through `thread-id` or
 `client_metadata.thread_id`. A parent task ID, session ID, or shared prompt-cache key alone is
 insufficient: side chats can share those values. Clients without a distinct identity continue with
 their requested effort unchanged. Confirm an `updated` diagnostic before treating a Desktop client
-as supported by this opt-in path.
+as supported by this path.
 
 State lives under `$OPENCODEX_HOME/astra-effort-cache/` (normally `~/.opencodex/astra-effort-cache/`).
 A private SQLite database contains hashed prefixes and envelope identities, effort values, and item positions. It contains
@@ -523,7 +524,7 @@ configuration updates remain client-managed and pass through unchanged.
 The standalone `/responses/compact` path receives the client's history, without proxy-injected updates.
 If clients supply updates themselves, that endpoint rejects them. OpenAI documents `compaction_trigger`
 as an alternative, with a fresh update after compaction; automatic post-compaction rewriting is not
-implemented by this opt-in path.
+implemented by this path.
 
 Enable provider diagnostics with `ocx debug provider on` or `OCX_DEBUG=1`. Diagnostics tagged
 `[ocx:openai-responses:astra-effort-cache]` report a fixed status code, baseline, and effective effort
@@ -533,9 +534,8 @@ request-level wire value. The upstream response's `reasoning.effort` still repor
 specified by OpenAI. `baseline_reset`, `missing_thread_identity`, `compaction`, and `unavailable_state`
 indicate that the optimization was not applied to that request.
 
-Unset `OCX_ASTRA_EFFORT_CACHE` or set it to `0` in the proxy process environment to disable rewriting.
-After a coordinated restart, ordinary request-level effort behavior resumes. Retained state files may
-be removed while the proxy is stopped. Do not share one thread identity across independent conversations.
+Retained state files may be removed while the proxy is stopped. The next request establishes a new
+baseline. Do not share one thread identity across independent conversations.
 
 See OpenAI's [reasoning update compatibility](https://developers.openai.com/api/docs/guides/reasoning#change-reasoning-mid-conversation)
 and [prompt caching guidance](https://developers.openai.com/api/docs/guides/prompt-caching#change-reasoning-effort-without-rewriting-the-prefix).

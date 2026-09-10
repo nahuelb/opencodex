@@ -1,4 +1,4 @@
-import { applyAstraEffortCache } from "./astra-effort-cache";
+import { applyAstraEffortCache, supportsAstraEffortCache } from "./astra-effort-cache";
 import { isOpenCodeGo, normalizeOpenCodeGoAgentMessages } from "./opencode-go";
 import { createHash } from "node:crypto";
 import { attachSideChatCache, prepareSideChatCache } from "../codex/side-chat-cache";
@@ -2503,7 +2503,7 @@ export function createResponsesPassthroughAdapter(provider: OcxProviderConfig): 
         parsed.modelId,
       );
       let astraReasoningLog: { effectiveEffort: string; wireField: "reasoning.effort"; wireValue: string } | undefined;
-      if (isCanonicalOpenAiForwardProvider(provider) && process.env["OCX_ASTRA_EFFORT_CACHE"] === "1") {
+      if (isCanonicalOpenAiForwardProvider(provider) && supportsAstraEffortCache(finalBody)) {
         const effortResult = applyAstraEffortCache(finalBody, parsed._rawBody, incoming.headers, new Headers(headers));
         finalBody = effortResult.body;
         if (effortResult.baseline && effortResult.effective) {
