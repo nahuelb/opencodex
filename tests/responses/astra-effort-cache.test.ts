@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { applyAstraEffortCache } from "../../src/adapters/astra-effort-cache";
 import { createResponsesPassthroughAdapter } from "../../src/adapters/openai-responses";
+import { completeSideChatCache, prepareSideChatCache, SIDE_CHAT_BOUNDARY } from "../../src/codex/side-chat-cache";
 import { parseRequest } from "../../src/responses/parser";
 import { prepareCodexWsRequest, CODEX_RESPONSES_HTTP_URL } from "../../src/server/responses/codex-ws-request";
 import { recordAdapterReasoning, applyResponseLogMetadata, type RequestLogContext } from "../../src/server/request-log";
@@ -204,5 +205,49 @@ describe("Astra adapter integration", () => {
     adapterRequest(first, "medium", {}, destination);
     expect(JSON.parse(adapterRequest(second, "low", {}, destination).body).reasoning.effort).toBe("low");
     expect(readdirSync(directory)).toEqual([]);
+  });
+});
+
+describe("combined local cache features", () => {
+  test("side inheritance and effort updates keep independent thread histories", () => {
+    const previous = process.env["OPENCODEX_SIDE_CHAT_CACHE"];
+    process.env["OCX_ASTRA_EFFORT_CACHE"] = "1";
+    process.env["OPENCODEX_SIDE_CHAT_CACHE"] = "1";
+    const parent = crypto.randomUUID();
+    const child = crypto.randomUUID();
+    const sibling = crypto.randomUUID();
+    const send = (thread: string, input: unknown[], effort: string, fork?: string) => {
+      const request = withTestTranslatorBudget(createResponsesPassthroughAdapter(provider)).buildRequest(
+        parseRequest(body(input, effort, { prompt_cache_key: thread, client_metadata: { thread_id: thread, session_id: thread } })),
+        { headers: new Headers({ authorization: "Bearer combined-fixture", "chatgpt-account-id": "combined-account", "thread-id": thread,
+          "session-id": thread, ...(fork ? { "x-codex-turn-metadata": JSON.stringify({ forked_from_thread_id: fork, session_id: thread }) } : {}) }) },
+      );
+      completeSideChatCache(request, { status: "completed" });
+      return { request, wire: JSON.parse(request.body) };
+    };
+    try {
+      send(parent, first, "medium");
+      const forkInput = [...first, assistant("OK"), user(SIDE_CHAT_BOUNDARY), user("Side question")];
+      const fork = send(child, forkInput, "medium", parent);
+      expect(fork.wire.prompt_cache_key).toBe(parent);
+      expect(new Headers(fork.request.headers).get("thread-id")).toBe(child);
+      expect(new Headers(fork.request.headers).get("session-id")).toBe(parent);
+      const followupInput = [...forkInput, assistant("OK"), user("Side followup")];
+      const low = send(child, followupInput, "low", parent);
+      expect(low.wire.reasoning.effort).toBe("medium");
+      expect(low.wire.input.filter((i: any) => i.type === "configuration_update")).toEqual([update("low")]);
+      expect(new Headers(low.request.headers).get("thread-id")).toBe(child);
+      const other = send(sibling, forkInput, "high", parent);
+      expect(other.wire.reasoning.effort).toBe("high");
+      expect(other.wire.input.some((i: any) => i.type === "configuration_update")).toBe(false);
+      const main = send(parent, second, "high");
+      expect(main.wire.reasoning.effort).toBe("medium");
+      expect(main.wire.input.filter((i: any) => i.type === "configuration_update")).toEqual([update("high")]);
+      expect(main.request.reasoningLog?.effectiveEffort).toBe("high");
+    } finally {
+      process.env["OPENCODEX_SIDE_CHAT_CACHE"] = "0";
+      prepareSideChatCache({}, {});
+      if (previous === undefined) delete process.env["OPENCODEX_SIDE_CHAT_CACHE"]; else process.env["OPENCODEX_SIDE_CHAT_CACHE"] = previous;
+    }
   });
 });
