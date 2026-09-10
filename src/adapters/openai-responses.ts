@@ -1,3 +1,4 @@
+import { applyAstraEffortCache } from "./astra-effort-cache";
 import { isOpenCodeGo, normalizeOpenCodeGoAgentMessages } from "./opencode-go";
 import { createHash } from "node:crypto";
 import { attachSideChatCache, prepareSideChatCache } from "../codex/side-chat-cache";
@@ -2501,6 +2502,16 @@ export function createResponsesPassthroughAdapter(provider: OcxProviderConfig): 
         provider,
         parsed.modelId,
       );
+      let astraReasoningLog: { effectiveEffort: string; wireField: "reasoning.effort"; wireValue: string } | undefined;
+      if (isCanonicalOpenAiForwardProvider(provider) && process.env["OCX_ASTRA_EFFORT_CACHE"] === "1") {
+        const effortResult = applyAstraEffortCache(finalBody, parsed._rawBody, incoming.headers, new Headers(headers));
+        finalBody = effortResult.body;
+        if (effortResult.baseline && effortResult.effective) {
+          astraReasoningLog = { effectiveEffort: effortResult.effective, wireField: "reasoning.effort", wireValue: effortResult.baseline };
+        }
+        console.info("[ocx:astra-effort-cache]", JSON.stringify({ status: effortResult.status,
+          baseline: effortResult.baseline, effective: effortResult.effective }));
+      }
       if (isCanonicalOpenAiForwardProvider(provider)) {
         const routingHeaders = new Headers(headers);
         applyCodexRoutingHint(routingHeaders, finalBody);
@@ -2544,6 +2555,7 @@ export function createResponsesPassthroughAdapter(provider: OcxProviderConfig): 
         ...(convertedRoutedToolSearchNames ? { convertedRoutedToolSearchNames } : {}),
         ...(convertedRoutedNamespaceToolAliases ? { convertedRoutedNamespaceToolAliases } : {}),
         ...(tierLog ? { tierLog } : {}),
+        ...(astraReasoningLog ? { reasoningLog: astraReasoningLog } : {}),
       };
       attachSideChatCache(request, cacheDecision);
       return request;

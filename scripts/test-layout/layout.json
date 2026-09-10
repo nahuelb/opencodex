@@ -1039,6 +1039,7 @@
     "responses-field-backfill.test.ts": "responses",
     "responses-forward-dangling-call.test.ts": "responses",
     "responses-forward-posit-continuation.test.ts": "responses",
+    "astra-effort-cache.test.ts": "responses",
     "responses-forward-prompt-envelope.test.ts": "responses",
     "responses-image-gen-repair.test.ts": "responses",
     "responses-inbound-store-default.test.ts": "responses",
