@@ -18,7 +18,12 @@ export function withAstraEffortState<T>(
 ): T {
   assertNotRealHomeUnderTest(getConfigDir());
   assertNotRealHomeUnderTest(directory);
-  if (!recordOwnedConfigPath(getConfigDir(), directory)) throw new Error("Unowned effort state directory");
+  const existing = lstatSync(directory, { throwIfNoEntry: false });
+  if (existing && (!existing.isDirectory() || existing.isSymbolicLink())) throw new Error("Invalid effort state directory");
+  if (!recordOwnedConfigPath(getConfigDir(), directory)) {
+    directory = join(directory, "owned-state");
+    if (!recordOwnedConfigPath(directory, join(directory, "state.sqlite"))) throw new Error("Unowned effort state directory");
+  }
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   if (!lstatSync(directory).isDirectory() || lstatSync(directory).isSymbolicLink()) throw new Error("Invalid effort state directory");
   if (process.platform !== "win32") chmodSync(directory, 0o700);

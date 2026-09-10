@@ -4571,7 +4571,15 @@ async function handleResponsesInner(
     let inspectionSawUndeclaredTool = false;
     const passiveQuotaObserved = hasPassiveAccountQuota(route.providerName)
       && route.provider.authMode === "oauth";
+    let sideChatFirstTerminal: string | undefined;
+    let sideChatCompletionSeen = false;
     const noteInspectedPayload = (payload: unknown) => {
+      if (sideChatFirstTerminal === undefined && payload && typeof payload === "object") {
+        const type = (payload as { type?: unknown }).type;
+        if (typeof type === "string" && ["response.completed", "response.failed", "response.incomplete", "error"].includes(type)) {
+          sideChatFirstTerminal = type;
+        }
+      }
       // Meta reports subscription usage ONLY as an in-stream event; there is no endpoint
       // to poll (003 §E probed 17 paths, all 404). Observed here rather than behind a
       // dedicated inspector handler because onParsedPayload already reaches every
@@ -4626,7 +4634,12 @@ async function handleResponsesInner(
         ) {
           return;
         }
-        completeSideChatCache(request, restoredResponse);
+        if (!sideChatCompletionSeen) {
+          sideChatCompletionSeen = true;
+          if (sideChatFirstTerminal === undefined || sideChatFirstTerminal === "response.completed") {
+            completeSideChatCache(request, restoredResponse);
+          }
+        }
         rememberPassthroughResponse(restoredResponse);
       }
       : undefined;

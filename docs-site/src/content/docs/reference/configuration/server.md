@@ -443,52 +443,11 @@ in `remoteGui.allowedTailscaleUsers`. Setting the origin without the user list p
 advertises itself correctly and then refuses every session; setting the user list without the
 origin produces sessions pointed at whichever origin the request happened to use.
 
-## Local side-chat cache experiment
+## Side-chat cache preservation
 
-This local v2.46.0 patch is disabled by default. Set `OPENCODEX_SIDE_CHAT_CACHE=1`,
-or create an empty `side-chat-cache.enabled` file in the OpenCodex configuration
-folder, to enable it. `OPENCODEX_SIDE_CHAT_CACHE=0` overrides the file. Removing
-that file disables the optimization on the next eligible request without changing
-the launch configuration. Installing or removing the code requires a proxy restart.
-
-Only canonical Codex-login Responses requests qualify. An explicit
-`forked_from_thread_id` must identify a completed parent request seen by this
-proxy process. Account credentials, model, settings, tools, instructions, and the
-observed input prefix must match. A side chat may reuse the proven history before
-a later reasoning-replay difference; that differing suffix stays unchanged. The patch does not change account
-selection: different selected accounts cause a skip. It never changes the model.
-
-Eligible children inherit the parent's outbound cache key and session identity.
-Their task IDs, replay state, responses, cancellation, and transport lanes remain
-separate. The patch never copies continuation IDs or turn-state headers.
-For the exact known Desktop side-chat rules, it preserves developer authority and
-moves those rules immediately before the existing side-chat boundary. The rules can
-appear inside a larger instruction block or a developer message with several text
-parts. An older side chat can match the exact inherited portion of a later parent
-snapshot through its unique boundary. Unknown
-instruction changes remain untouched and cause a skip.
-
-Codex Desktop also varies the nested-method reference inside `functions.exec`.
-For the recognized wrapper format, the patch retains shared method documentation
-in the tool description and places the complete current goal, clock, permission-request, onboarding,
-and voice-transfer method sections in a developer reference after the input.
-Each request retains its own available methods and signatures. The patch neither
-copies another task's method list nor changes the executable tool schema.
-Unknown method sections and shared-description changes remain untouched.
-
-A known side-chat user boundary is also retained as a developer instruction when
-there is no separate side-rule block to move. The original user boundary remains.
-
-The map retains only fingerprints, tool names, structural diagnostics, and cache identifiers for up to 64 tasks and
-2,048 input items per snapshot. Entries expire after ten minutes. Compaction,
-continuation requests, ambiguous boundaries, missing parents, and incompatible
-nested side chats skip the optimization. A successful child keeps its original
-parent snapshot while that snapshot remains valid. The map resets on restart.
-
-`[ocx:side-chat-cache]` log records contain process-local task tags, decision codes,
-and token counts. They contain no prompts, credentials, or raw account/task IDs.
-A new Desktop Luna side chat reused 29,440 of 31,782 input tokens on its first
-request in local validation. Provider caching remains opportunistic and can miss.
+Enable `providers.openai.experimentalCodexSideChatCache` for canonical Codex forwarding.
+The local combined trial enables this option. State and diagnostic behavior match the latest
+side-chat implementation; legacy environment variables and marker files are not consulted.
 
 ## Astra effort cache preservation
 
@@ -514,7 +473,7 @@ A private SQLite database contains hashed prefixes and envelope identities, effo
 no conversation text, credentials, or raw account/task identifiers. SQLite releases locks when a process exits, including crashes. State survives restart; a fork or
 missing baseline starts a new baseline using the requested effort. Changed instructions or tools also
 start a new baseline. Each conversation/account is limited to 256 request snapshots and 2 MiB of state;
-requests exceeding those limits use their requested effort unchanged. Across conversations, the store retains at most 128 entries and 16 MiB of payload, evicting the least recently used entries. Entries expire after seven days without access; pruning runs on requests. The database is capped at 32 MiB, with a temporary rollback journal bounded by that size. The cache directory is registered once for uninstall cleanup. Conflicting retries and missing
+requests exceeding those limits use their requested effort unchanged. Across conversations, the store retains at most 128 entries and 16 MiB of payload, evicting the least recently used entries. Entries expire after seven days without access; pruning runs on requests. The database is capped at 32 MiB, with a temporary rollback journal bounded by that size. The cache directory is registered once for uninstall cleanup. Legacy configuration folders without ownership metadata use a separately owned `owned-state/` subdirectory; existing user files are not adopted. Conflicting retries and missing
 user boundaries reset history. A busy, corrupt, or unavailable state file causes unchanged fallback.
 
 Automatic context management, automatic truncation, multi-agent history, and compaction input disable

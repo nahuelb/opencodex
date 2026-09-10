@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { SideChatCache, SIDE_CHAT_RULES, SIDE_CHAT_BOUNDARY, completeSideChatCache } from "../../src/codex/side-chat-cache";
+import { describe, expect, test } from "bun:test";
+import { getDefaultConfig, validateConfigCandidate } from "../../src/config";
+import { SideChatCache, SIDE_CHAT_RULES, SIDE_CHAT_BOUNDARY, completeSideChatCache, prepareSideChatCache } from "../../src/codex/side-chat-cache";
 import { createResponsesPassthroughAdapter } from "../../src/adapters/openai-responses";
 import { codexWsReuseIdentity } from "../../src/server/responses/codex-ws-pool";
 import { withTestTranslatorBudget } from "../helpers/translator-budget";
@@ -170,7 +171,7 @@ describe("side-chat cache lineage", () => {
     child.input[0].content = { type: "encrypted_content", encrypted_content: "opaque" };
     const result = cache.prepare(child, headers("child", "parent"));
     expect(result.body).toBe(child);
-    expect(result.layout?.child.encrypted).toBe(true);
+    expect((result.body.input as typeof child.input)[0].content.encrypted_content).toBe("opaque");
   });
   test("supports flat developer text and flat side boundaries", () => {
     const cache = new SideChatCache();
@@ -309,11 +310,9 @@ describe("side-chat cache lineage", () => {
   });
 });
 
-const oldFlag = process.env.OPENCODEX_SIDE_CHAT_CACHE;
-afterEach(() => { if (oldFlag === undefined) delete process.env.OPENCODEX_SIDE_CHAT_CACHE; else process.env.OPENCODEX_SIDE_CHAT_CACHE = oldFlag; });
 test("adapter integration records completion, isolates replay input, and honors the off switch", () => {
-  process.env.OPENCODEX_SIDE_CHAT_CACHE = "1";
-  const adapter = withTestTranslatorBudget(createResponsesPassthroughAdapter({ adapter: "openai-responses", authMode: "forward", baseUrl: "https://chatgpt.com/backend-api/codex" }));
+  const provider = { adapter: "openai-responses", authMode: "forward" as const, baseUrl: "https://chatgpt.com/backend-api/codex", experimentalCodexSideChatCache: true };
+  const adapter = withTestTranslatorBudget(createResponsesPassthroughAdapter(provider));
   const build = (raw: ReturnType<typeof body>, h: Record<string, string>, previousResponseId?: string) => adapter.buildRequest({ modelId: raw.model, context: { messages: [] }, stream: true, options: {}, _rawBody: raw, previousResponseId }, { headers: new Headers(h) });
   const parent = build(body(), headers()); parent.releaseBodyObservation?.();
   completeSideChatCache(parent, { status: "failed" });
@@ -322,6 +321,105 @@ test("adapter integration records completion, isolates replay input, and honors 
   const raw = side(); const child = build(raw, headers("child", "parent")); child.releaseBodyObservation?.();
   expect(JSON.parse(child.body).prompt_cache_key).toBe("parent"); expect(raw.prompt_cache_key).toBe("child");
   const chained = build(raw, headers("child", "parent"), "resp_own"); chained.releaseBodyObservation?.(); expect(JSON.parse(chained.body).prompt_cache_key).toBe("child");
-  process.env.OPENCODEX_SIDE_CHAT_CACHE = "0";
+  provider.experimentalCodexSideChatCache = false;
   const off = build(raw, headers("child", "parent")); off.releaseBodyObservation?.(); expect(JSON.parse(off.body).prompt_cache_key).toBe("child");
+});
+
+
+test("side-chat cache configuration is explicit, boolean, and canonical-provider only", () => {
+  const config = getDefaultConfig();
+  expect(config.providers.openai!.experimentalCodexSideChatCache).toBeUndefined();
+  expect(validateConfigCandidate(config).ok).toBe(true);
+  for (const enabled of [true, false]) {
+    config.providers.openai!.experimentalCodexSideChatCache = enabled;
+    const result = validateConfigCandidate(config);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.config.providers.openai!.experimentalCodexSideChatCache).toBe(enabled);
+  }
+  expect(validateConfigCandidate({ ...config, providers: { ...config.providers,
+    openai: { ...config.providers.openai, experimentalCodexSideChatCache: "true" },
+  } }).ok).toBe(false);
+  config.providers.other = { ...config.providers.openai! };
+  expect(validateConfigCandidate(config).ok).toBe(false);
+  delete config.providers.other;
+  config.providers.openai!.baseUrl = "https://example.com/v1";
+  expect(validateConfigCandidate(config).ok).toBe(false);
+});
+
+
+test("disabled preparation leaves the tool reference and request untouched", () => {
+  const raw = body("parent", [execCatalog(execDescription(false)), ...history] as never);
+  const before = structuredClone(raw);
+  expect(prepareSideChatCache(raw, headers(), false)).toBeUndefined();
+  expect(raw).toEqual(before);
+});
+
+test("unknown executor formats and method contracts remain unchanged", () => {
+  const cache = new SideChatCache();
+  for (const description of ["Unknown format", execDescription(false).replace("create_goal(args", "create_goal_v2(args")]) {
+    const raw = body("parent", [execCatalog(description), ...history] as never);
+    expect(cache.prepare(raw, headers()).body).toEqual(raw);
+  }
+});
+
+test("an old completion cannot seed a newly enabled runtime", () => {
+  const provider = { adapter: "openai-responses", authMode: "forward" as const,
+    baseUrl: "https://chatgpt.com/backend-api/codex", experimentalCodexSideChatCache: true };
+  const adapter = withTestTranslatorBudget(createResponsesPassthroughAdapter(provider));
+  const build = (raw: ReturnType<typeof body>, h: Record<string, string>) => {
+    const request = adapter.buildRequest({ modelId: raw.model, context: { messages: [] }, stream: true,
+      options: {}, _rawBody: raw }, { headers: new Headers(h) });
+    request.releaseBodyObservation?.();
+    return request;
+  };
+  prepareSideChatCache({}, {}, false);
+  const parent = build(body(), headers());
+  prepareSideChatCache({}, {}, false);
+  build(body("other"), headers("other"));
+  completeSideChatCache(parent, { status: "completed" });
+  expect(JSON.parse(build(side(), headers("child", "parent")).body).prompt_cache_key).toBe("child");
+  prepareSideChatCache({}, {}, false);
+});
+
+
+test("stream delivery differences preserve each wire's options while allowing parent reuse", () => {
+  const cache = new SideChatCache();
+  const parent = { ...body(), stream_options: { include_obfuscation: false, reasoning_summary_delivery: "sequential" } };
+  cache.prepare(parent, headers()).complete();
+  for (const options of [undefined, {}, { include_obfuscation: true, reasoning_summary_delivery: "concurrent" }]) {
+    const raw = { ...side(), ...(options === undefined ? {} : { stream_options: options }) };
+    const before = structuredClone(raw);
+    const result = cache.prepare(raw, headers("child", "parent"));
+    expect(result.body.prompt_cache_key).toBe("parent");
+    expect(result.body.stream_options).toEqual(options);
+    expect(raw).toEqual(before);
+  }
+  expect(parent.stream_options).toEqual({ include_obfuscation: false, reasoning_summary_delivery: "sequential" });
+});
+
+test("unknown stream settings and malformed known options still prevent parent reuse", () => {
+  const cache = seeded();
+  for (const options of [{ future_option: true }, { include_obfuscation: "false" }, { reasoning_summary_delivery: "unknown" }, { reasoning_summary_delivery: ["concurrent"] }]) {
+    const raw = { ...side(), stream_options: options };
+    const result = cache.prepare(raw, headers("child", "parent"));
+    expect(result.reason).toBe("settings-change");
+    expect(result.body.prompt_cache_key).toBe("child");
+    expect(result.body.stream_options).toEqual(options);
+  }
+});
+
+
+test.each(["developer", "user"])("extra inherited %s items remain an unmatched suffix of a verified prefix", role => {
+  const cache = seeded();
+  const extra = message(role, "Additional reference history");
+  const raw = body("child", [...history, extra, boundary, message("user", "Child question")]);
+  const before = structuredClone(raw);
+  const result = cache.prepare(raw, headers("child", "parent"));
+  expect(result.body.prompt_cache_key).toBe("parent");
+  expect(result.matchedItems).toBe(history.length);
+  expect(result.body.input).toEqual([...history, extra, message("developer", SIDE_CHAT_BOUNDARY), boundary, message("user", "Child question")]);
+  expect(raw).toEqual(before);
+  const changedPrefix = structuredClone(raw);
+  changedPrefix.input[1] = message("user", "Different parent question");
+  expect(cache.prepare(changedPrefix, headers("child", "parent")).reason).toBe("input-prefix-change");
 });

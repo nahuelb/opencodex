@@ -281,14 +281,11 @@ describe("durable effort state lifecycle", () => {
 
 describe("combined local cache features", () => {
   test("side inheritance and effort updates keep independent thread histories", () => {
-    const previous = process.env["OPENCODEX_SIDE_CHAT_CACHE"];
-    process.env["OCX_ASTRA_EFFORT_CACHE"] = "1";
-    process.env["OPENCODEX_SIDE_CHAT_CACHE"] = "1";
     const parent = crypto.randomUUID();
     const child = crypto.randomUUID();
     const sibling = crypto.randomUUID();
     const send = (thread: string, input: unknown[], effort: string, fork?: string) => {
-      const request = withTestTranslatorBudget(createResponsesPassthroughAdapter(provider)).buildRequest(
+      const request = withTestTranslatorBudget(createResponsesPassthroughAdapter({ ...provider, experimentalCodexSideChatCache: true })).buildRequest(
         parseRequest(body(input, effort, { prompt_cache_key: thread, client_metadata: { thread_id: thread, session_id: thread } })),
         { headers: new Headers({ authorization: "Bearer combined-fixture", "chatgpt-account-id": "combined-account", "thread-id": thread,
           "session-id": thread, ...(fork ? { "x-codex-turn-metadata": JSON.stringify({ forked_from_thread_id: fork, session_id: thread }) } : {}) }) },
@@ -316,9 +313,24 @@ describe("combined local cache features", () => {
       expect(main.wire.input.filter((i: any) => i.type === "configuration_update")).toEqual([update("high")]);
       expect(main.request.reasoningLog?.effectiveEffort).toBe("high");
     } finally {
-      process.env["OPENCODEX_SIDE_CHAT_CACHE"] = "0";
-      prepareSideChatCache({}, {});
-      if (previous === undefined) delete process.env["OPENCODEX_SIDE_CHAT_CACHE"]; else process.env["OPENCODEX_SIDE_CHAT_CACHE"] = previous;
+      prepareSideChatCache({}, {}, false);
     }
   });
+});
+
+test("legacy config folders retain unowned files while using a private cache substore", () => {
+  const legacy = join(directory, "legacy");
+  mkdirSync(legacy);
+  writeFileSync(join(legacy, "existing-user-data.txt"), "preserve");
+  process.env["OPENCODEX_HOME"] = legacy;
+  const adapter = withTestTranslatorBudget(createResponsesPassthroughAdapter(provider));
+  const headers = new Headers({ "thread-id": "legacy-thread", "chatgpt-account-id": "test-account" });
+  adapter.buildRequest(parseRequest(body(first)), { headers });
+  const request = adapter.buildRequest(parseRequest(body(second, "low")), { headers });
+  expect(JSON.parse(request.body).reasoning.effort).toBe("medium");
+  expect(request.reasoningLog?.effectiveEffort).toBe("low");
+  expect(readdirSync(legacy)).toEqual(expect.arrayContaining(["existing-user-data.txt", "astra-effort-cache"]));
+  expect(readdirSync(legacy)).not.toContain(CONFIG_UNINSTALL_MANIFEST);
+  expect(removeOwnedConfigState(join(legacy, "astra-effort-cache", "owned-state")).status).toBe("removed");
+  expect(readFileSync(join(legacy, "existing-user-data.txt"), "utf8")).toBe("preserve");
 });

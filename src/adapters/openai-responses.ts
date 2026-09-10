@@ -2534,7 +2534,7 @@ export function createResponsesPassthroughAdapter(provider: OcxProviderConfig): 
       );
       const cacheDecision = isCanonicalOpenAiForwardProvider(provider)
         && !parsed.previousResponseId && parsed._compactionRequest !== true
-        ? prepareSideChatCache(finalBody, headers) : undefined;
+        ? prepareSideChatCache(finalBody, headers, provider.experimentalCodexSideChatCache === true) : undefined;
       if (cacheDecision) {
         finalBody = cacheDecision.body;
         headers = cacheDecision.headers;
