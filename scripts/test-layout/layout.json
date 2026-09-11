@@ -1326,7 +1326,9 @@
     "zz-pr-coderabbit-readiness-revalidation.test.ts": "ci-workflows",
     "codex-side-chat-cache.test.ts": "codex-integration",
     "astra-effort-cache-metrics.test.ts": "usage",
-    "astra-effort-cache-proxy.test.ts": "responses"
+    "astra-effort-cache-proxy.test.ts": "responses",
+    "side-chat-cache-metrics.test.ts": "usage",
+    "side-chat-cache-proxy.test.ts": "responses"
   },
   "migrated": [
     "adapters",

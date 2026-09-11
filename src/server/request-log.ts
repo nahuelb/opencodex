@@ -1,4 +1,5 @@
 import { normalizeAstraEffortCacheMetrics, type AstraEffortCacheMetrics } from "../usage/astra-effort-cache";
+import { normalizeSideChatCacheMetrics, sideChatCacheLogFields, type SideChatCacheMetrics } from "../usage/side-chat-cache";
 import { existsSync, readFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import type { ResponsesTerminalStatus } from "../bridge";
@@ -92,6 +93,7 @@ export interface RequestLogContext {
   reasoningWireField?: string;
   reasoningWireValue?: string | number | boolean;
   astraEffortCache?: AstraEffortCacheMetrics;
+  sideChatCache?: SideChatCacheMetrics;
   callerServiceTier?: string;
   requestedServiceTier?: string;
   requestedSpeedLabel?: string;
@@ -185,6 +187,7 @@ export interface RequestLogEntry {
   reasoningWireField?: string;
   reasoningWireValue?: string | number | boolean;
   astraEffortCache?: AstraEffortCacheMetrics;
+  sideChatCache?: SideChatCacheMetrics;
   callerServiceTier?: string;
   requestedServiceTier?: string;
   requestedSpeedLabel?: string;
@@ -305,6 +308,7 @@ export function requestLogEntryFromPersistedUsage(entry: PersistedUsageEntry): R
     ...(entry.reasoningWireField ? { reasoningWireField: entry.reasoningWireField } : {}),
     ...(entry.reasoningWireValue !== undefined ? { reasoningWireValue: entry.reasoningWireValue } : {}),
     ...(normalizeAstraEffortCacheMetrics(entry.astraEffortCache) ? { astraEffortCache: normalizeAstraEffortCacheMetrics(entry.astraEffortCache) } : {}),
+    ...sideChatCacheLogFields(entry.sideChatCache),
     ...(entry.callerServiceTier ? { callerServiceTier: entry.callerServiceTier } : {}),
     ...(entry.requestedServiceTier ? { requestedServiceTier: entry.requestedServiceTier } : {}),
     ...(entry.requestedSpeedLabel ? { requestedSpeedLabel: entry.requestedSpeedLabel } : {}),
@@ -386,13 +390,16 @@ export function addRequestLog(entry: RequestLogEntry) {
   // sanitization bug because the safe surface is the one you check.
   const shadowCallRewrittenFrom = sanitizeLogMetadataString(entry.shadowCallRewrittenFrom);
   const claudeCompatibility = normalizeClaudeCompatibilityUsageLog(entry.claudeCompatibility);
-  const retained: RequestLogEntry = shadowCallRewrittenFrom === entry.shadowCallRewrittenFrom && entry.claudeCompatibility === undefined && entry.astraEffortCache === undefined
+  const retained: RequestLogEntry = shadowCallRewrittenFrom === entry.shadowCallRewrittenFrom && entry.claudeCompatibility === undefined && entry.astraEffortCache === undefined && entry.sideChatCache === undefined
     ? entry
     : { ...entry, ...(shadowCallRewrittenFrom ? { shadowCallRewrittenFrom } : {}) };
   if (!shadowCallRewrittenFrom && retained !== entry) delete retained.shadowCallRewrittenFrom;
   const astraMetrics = normalizeAstraEffortCacheMetrics(entry.astraEffortCache);
   if (astraMetrics) retained.astraEffortCache = astraMetrics;
   else if (retained !== entry) delete retained.astraEffortCache;
+  const sideMetrics = normalizeSideChatCacheMetrics(entry.sideChatCache);
+  if (sideMetrics) retained.sideChatCache = sideMetrics;
+  else if (retained !== entry) delete retained.sideChatCache;
   if (claudeCompatibility) retained.claudeCompatibility = claudeCompatibility;
   else if (retained !== entry) delete retained.claudeCompatibility;
   entry = retained;
@@ -436,6 +443,7 @@ export function addRequestLog(entry: RequestLogEntry) {
       ...(entry.reasoningWireField ? { reasoningWireField: entry.reasoningWireField } : {}),
       ...(entry.reasoningWireValue !== undefined ? { reasoningWireValue: entry.reasoningWireValue } : {}),
       ...(normalizeAstraEffortCacheMetrics(entry.astraEffortCache) ? { astraEffortCache: normalizeAstraEffortCacheMetrics(entry.astraEffortCache) } : {}),
+      ...sideChatCacheLogFields(entry.sideChatCache),
       ...(entry.callerServiceTier ? { callerServiceTier: entry.callerServiceTier } : {}),
       ...(entry.requestedServiceTier ? { requestedServiceTier: entry.requestedServiceTier } : {}),
       ...(entry.requestedSpeedLabel ? { requestedSpeedLabel: entry.requestedSpeedLabel } : {}),
@@ -502,11 +510,24 @@ export function recordAttemptRequestedEffort(logCtx: RequestLogContext): void {
   }
 }
 
+export function recordAdapterSideChatCache(logCtx: RequestLogContext, request: AdapterRequest): void {
+  delete logCtx.sideChatCache;
+  if (logCtx.activeAttempt) delete logCtx.activeAttempt.sideChatCache;
+  try {
+    const metrics = normalizeSideChatCacheMetrics(request.sideChatCache);
+    if (metrics) {
+      logCtx.sideChatCache = metrics;
+      if (logCtx.activeAttempt) logCtx.activeAttempt.sideChatCache = metrics;
+    }
+  } catch { }
+}
+
 /** Copy the adapter's exact outbound reasoning parameter into the durable request log. */
 export function recordAdapterReasoning(
   logCtx: RequestLogContext,
   request: AdapterRequest,
 ): void {
+  recordAdapterSideChatCache(logCtx, request);
   delete logCtx.effectiveEffort;
   delete logCtx.reasoningWireField;
   delete logCtx.reasoningWireValue;
@@ -1072,6 +1093,7 @@ export function addFinalRequestLog(
     ...(logCtx.reasoningWireField ? { reasoningWireField: logCtx.reasoningWireField } : {}),
     ...(logCtx.reasoningWireValue !== undefined ? { reasoningWireValue: logCtx.reasoningWireValue } : {}),
     ...(normalizeAstraEffortCacheMetrics(logCtx.astraEffortCache) ? { astraEffortCache: normalizeAstraEffortCacheMetrics(logCtx.astraEffortCache) } : {}),
+    ...sideChatCacheLogFields(logCtx.activeAttempt ? logCtx.activeAttempt.sideChatCache : logCtx.sideChatCache),
     ...(logCtx.callerServiceTier ? { callerServiceTier: logCtx.callerServiceTier } : {}),
     ...(logCtx.requestedServiceTier ? { requestedServiceTier: logCtx.requestedServiceTier } : {}),
     ...(logCtx.requestedSpeedLabel ? { requestedSpeedLabel: logCtx.requestedSpeedLabel } : {}),
