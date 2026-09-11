@@ -1324,7 +1324,9 @@
     "zz-ci-api-usage-isolation.test.ts": "ci-workflows",
     "zz-ci-storage-policy-isolation.test.ts": "ci-workflows",
     "zz-pr-coderabbit-readiness-revalidation.test.ts": "ci-workflows",
-    "codex-side-chat-cache.test.ts": "codex-integration"
+    "codex-side-chat-cache.test.ts": "codex-integration",
+    "astra-effort-cache-metrics.test.ts": "usage",
+    "astra-effort-cache-proxy.test.ts": "responses"
   },
   "migrated": [
     "adapters",
