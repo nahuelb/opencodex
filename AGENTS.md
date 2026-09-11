@@ -74,10 +74,11 @@ must not issue model requests just to warm or probe the cache.
 ### Local checkout, automation, and safe refresh
 
 These paths describe the maintainer's machine, not dependencies for other clones.
-Read `~/.agents/AGENTS.md` when present. The combined checkout is
-`~/Projects/opencodex-cache-local` on branch `main`; the directory name is historical.
-The app's saved project can point at `~/Projects/opencodex`, which is a different
-checkout. Verify the actual worktree rather than editing the saved project by assumption.
+Read `~/.agents/AGENTS.md` when present. The combined daily-driver checkout and the
+app's saved project are `~/Projects/opencodex`, with `main` checked out there.
+`~/Projects/opencodex-cache-local` is retained as a detached historical checkout.
+Git permits a branch in only one worktree: keep `main` in the saved project and use
+separate feature branches in other worktrees. Verify the actual worktree before editing.
 
 The active Codex schedule **Update OpenCodex fork and local service** runs daily at
 **06:00 America/Argentina/Buenos_Aires**, using **gpt-6-astra / low**. Its ID is
@@ -94,7 +95,7 @@ Use the independent updater in `~/Projects/Codex/tools/opencodex-refresh/`; read
 
 ```sh
 python3 "$HOME/Projects/Codex/tools/opencodex-refresh/refresh.py" prepare \
-  --repo "$HOME/Projects/opencodex-cache-local" --ref main
+  --repo "$HOME/Projects/opencodex" --ref main
 ```
 
 Preparation builds a committed revision while the old service stays online. Apply the
