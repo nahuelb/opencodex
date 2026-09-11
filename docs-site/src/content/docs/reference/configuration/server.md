@@ -589,3 +589,15 @@ proof. Synthetic token counts must never be interpreted as observed model cache 
 Run several trials on the target operating system, including Windows, before drawing rollout
 conclusions. Local fixtures test routing and wire preservation; they cannot establish upstream
 acceptance or Codex Desktop behavior. Use actual reported usage during normal work for that evidence.
+
+
+### Combined cache report in this fork
+
+```bash
+bun scripts/cache-features-report.ts 1000
+```
+
+This reads the recent usage ledger once and returns separate Astra effort-cache and side-chat
+summaries. An optional second argument selects an exact request ID within that window. One request
+can appear in both feature groups, so do not add their token totals together. The groups describe
+feature decisions and observed cache reads; they do not attribute a hit to either feature.

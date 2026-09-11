@@ -1163,5 +1163,6 @@
   "astra-effort-cache-metrics.test.ts": "usage",
   "astra-effort-cache-proxy.test.ts": "responses",
   "side-chat-cache-metrics.test.ts": "usage",
-  "side-chat-cache-proxy.test.ts": "responses"
+  "side-chat-cache-proxy.test.ts": "responses",
+  "cache-features-combined.test.ts": "usage"
 }
