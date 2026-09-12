@@ -55,3 +55,53 @@ test("nested attempts do not change request totals or substitute for missing req
   const logs = [{ ...row(10), attempts: [row(90), row(50)] }, { attempts: [row(100)] }];
   expect(summarizeCache(logs)).toMatchObject({ hits: 1, unknown: 1, read: 10, input: 100 });
 });
+
+const mixedCombo: CacheLogEntry = {
+  provider: "combo", usageStatus: "reported",
+  usage: { inputTokens: 200, cachedInputTokens: 90, cacheReadInputTokens: 0, cacheCreationInputTokens: 20 },
+  attempts: [
+    { provider: "openai", usageStatus: "reported", usage: { inputTokens: 100, cachedInputTokens: 90 } },
+    { provider: "anthropic", usageStatus: "reported", usage: { inputTokens: 100, cachedInputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 20 } },
+  ],
+};
+
+test("mixed-adapter combo normalizes attempt reads before combining optional fields", () => {
+  expect(cacheResult(mixedCombo)).toEqual({ outcome: "hit", input: 200, read: 90, write: undefined, uncached: 110, ratio: 0.45 });
+  expect(filterLogs([mixedCombo], { ...DEFAULT_LOG_FILTER_STATE, cache: "hit" })).toEqual([mixedCombo]);
+  expect(filterLogs([mixedCombo], { ...DEFAULT_LOG_FILTER_STATE, cache: "miss" })).toEqual([]);
+  expect(summarizeCache([mixedCombo])).toMatchObject({ hits: 1, misses: 0, input: 200, read: 90, reuseRate: 0.45 });
+});
+
+test("combo requires complete reported cache-read coverage even when parent fields suggest a miss", () => {
+  for (const attempt of [
+    { usageStatus: "reported", usage: { inputTokens: 100 } },
+    { ...row(0), usageStatus: "estimated" }, { ...row(0), usageStatus: "unreported" },
+    { ...row(0), usageStatus: "unsupported" }, row(-1), null, "bad", {}, [],
+  ]) {
+    const combo = { ...mixedCombo, attempts: [row(0), attempt] };
+    expect(cacheResult(combo).outcome).toBe("unknown");
+    expect(summarizeCache([combo])).toMatchObject({ hits: 0, misses: 0, unknown: 1, input: 0, read: 0 });
+    expect(cacheResult({ ...combo, attempts: [row(90), attempt] }).outcome).toBe("unknown");
+  }
+});
+
+test("combo rejects incomplete attempts and preserves unknown parent usage", () => {
+  for (const attempts of [undefined, [], [row(0)], [row(0), row(0), row(0)]]) {
+    expect(cacheResult({ ...mixedCombo, attempts }).outcome).toBe("unknown");
+  }
+  expect(cacheResult({ ...mixedCombo, usage: undefined }).outcome).toBe("unknown");
+  expect(cacheResult({ ...mixedCombo, usageStatus: "estimated" }).outcome).toBe("unknown");
+  expect(cacheResult({ ...mixedCombo, usage: { ...mixedCombo.usage!, estimated: true } }).outcome).toBe("unknown");
+});
+
+test("combo sums complete writes and handles legacy fields within their own attempt", () => {
+  const combo = {
+    ...mixedCombo,
+    attempts: [
+      { usage: { inputTokens: 100, cachedInputTokens: 70, cacheCreationInputTokens: 20 } },
+      { usage: { inputTokens: 100, cacheReadInputTokens: 20, cacheCreationInputTokens: 30 } },
+    ],
+  };
+  expect(cacheResult(combo)).toMatchObject({ outcome: "hit", read: 70, write: 50, ratio: 0.35, uncached: 130 });
+  expect(cacheResult({ ...mixedCombo, attempts: [row(0), row(0)] })).toMatchObject({ outcome: "miss", read: 0, ratio: 0 });
+});

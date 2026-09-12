@@ -112,7 +112,9 @@ input tokens for known requests; it does not average request percentages.
 
 Open request details for exact cache-read, cache-write, and non-reused input counts.
 Non-reused input includes cache writes. Attempt outcomes appear separately and are
-not added again to request totals. When present, **Local cache diagnostics** shows
+not added again to request totals. Combo cache counts are normalized per attempt before
+combining them. Incomplete or unknown attempt coverage keeps the combo cache outcome
+unknown. When present, **Local cache diagnostics** shows
 Astra preservation and side-chat prefix decisions, including attempt-specific data.
 These local decisions do not prove a provider cache hit.
 
