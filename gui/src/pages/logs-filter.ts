@@ -1,3 +1,4 @@
+import { cacheResult, type CacheFilter, type CacheLogEntry } from "./logs-cache";
 import { matchesLogConversationId } from "../log-conversation-id";
 import type { LogSurface, LogSurfaceFilter } from "./logs-surface-filter";
 import { logMatchesSurface } from "./logs-surface-filter";
@@ -6,6 +7,7 @@ export type LogTimeWindow = "all" | "15m" | "1h" | "24h";
 export type LogStatusFilter = "all" | "success" | "errors";
 
 export interface LogFilterState {
+  cache: CacheFilter;
   surface: LogSurfaceFilter;
   model: string;
   provider: string;
@@ -19,6 +21,7 @@ export interface LogFilterState {
 }
 
 export const DEFAULT_LOG_FILTER_STATE: LogFilterState = {
+  cache: "all",
   surface: "all",
   model: "",
   provider: "",
@@ -33,7 +36,7 @@ export interface FilterableLogAttempt {
   model?: unknown;
 }
 
-export interface FilterableLogEntry {
+export interface FilterableLogEntry extends CacheLogEntry {
   timestamp?: unknown;
   model?: unknown;
   resolvedModel?: unknown;
@@ -50,7 +53,8 @@ export interface FilterableLogEntry {
 
 /** Return whether any filter differs from the inert default state. */
 export function hasActiveLogFilters(filters: LogFilterState): boolean {
-  return filters.surface !== "all"
+  return filters.cache !== "all"
+    || filters.surface !== "all"
     || filters.model.trim() !== ""
     || filters.provider.trim() !== ""
     || filters.status !== "all"
@@ -96,6 +100,7 @@ export function filterLogs<T extends FilterableLogEntry>(
   const since = timeThreshold(filters.timeWindow, now);
 
   return logs.filter(log => {
+    if (filters.cache !== "all" && cacheResult(log).outcome !== filters.cache) return false;
     if (!logMatchesSurface(log, filters.surface)) return false;
     if (filters.interceptedOnly && typeof log.shadowCallRewrittenFrom !== "string") return false;
     if (conversationQuery && !matchesLogConversationId(

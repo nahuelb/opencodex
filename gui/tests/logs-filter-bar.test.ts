@@ -124,7 +124,7 @@ test("LogsFilterBar speed choices have non-overlapping bounds and clear both bou
 test.each(["pointer", "keyboard"] as const)("LogsFilterBar %s reset restores focus to All and clears every field", async activation => {
   await withFilterBar({
     ...DEFAULT_LOG_FILTER_STATE, surface: "grok", status: "errors", provider: "xai",
-    model: "model-a", timeWindow: "1h", minTokPerSec: 50, interceptedOnly: true,
+    model: "model-a", cache: "miss", timeWindow: "1h", minTokPerSec: 50, interceptedOnly: true,
     conversationId: "conversation-a", conversationQueryHash: "cached-hash",
   }, async ui => {
     expect(ui.container.textContent).toContain("Showing 1 of 2");
@@ -181,5 +181,21 @@ test("LogsFilterBar rendered radios move selection, focus and the single tab sto
     expect(unrelated.defaultPrevented).toBe(false);
     expect(ui.filters().surface).toBe("all");
     expect(document.activeElement).toBe(radio("all"));
+  });
+});
+
+
+test("cache filter preserves other selections and can be reset", async () => {
+  await withFilterBar({ ...DEFAULT_LOG_FILTER_STATE, provider: "openai" }, async ui => {
+    const select = ui.container.querySelector<HTMLSelectElement>('select[aria-label="logs.cache.label"]')!;
+    expect(select).not.toBeNull();
+    for (const outcome of ["hit", "miss", "unknown", "all"] as const) {
+      await act(async () => {
+        select.value = outcome;
+        select.dispatchEvent(new ui.win.Event("change", { bubbles: true }));
+      });
+      expect(ui.filters().cache).toBe(outcome);
+      expect(ui.filters().provider).toBe("openai");
+    }
   });
 });

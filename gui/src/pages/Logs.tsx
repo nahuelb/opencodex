@@ -1,3 +1,4 @@
+import { CacheCell, CacheSummary, CacheDetails, type CacheDiagnostics } from "./logs-cache-view";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useI18n, LOCALES, type TFn } from "../i18n/shared";
@@ -115,7 +116,7 @@ type AttemptRecoveryKind =
   | "image-413"
   | "empty-completion";
 
-interface LogAttempt {
+interface LogAttempt extends CacheDiagnostics {
   ordinal: number;
   provider: string;
   model: string;
@@ -137,7 +138,7 @@ interface LogAttempt {
   displayMetrics?: LogDisplayMetrics;
 }
 
-export interface LogEntry {
+export interface LogEntry extends CacheDiagnostics {
   requestId?: string;
   timestamp: number;
   model: string;
@@ -682,6 +683,8 @@ export default function Logs({ apiBase }: { apiBase: string }) {
         onResetFilters={() => setFilters(DEFAULT_LOG_FILTER_STATE)}
       />
 
+      {logs.length > 0 && <CacheSummary logs={filteredLogs} t={t} locale={localeTag ?? locale} />}
+
       {conversationTotals && (
         <div className="logs-conversation-totals">
           <Notice tone="ok">
@@ -747,6 +750,7 @@ export default function Logs({ apiBase }: { apiBase: string }) {
             <colgroup>
               <col className="logs-col-time" />
               <col className="logs-col-tokens" />
+              <col className="logs-col-cache" />
               <col className="logs-col-rate" />
               <col className="logs-col-cost" />
               <col className="logs-col-model" />
@@ -760,6 +764,7 @@ export default function Logs({ apiBase }: { apiBase: string }) {
              <tr>
                <th>{t("logs.col.time")}</th>
                 <th className="num log-col-tokens">{t("logs.col.tokens")}</th>
+                <th className="num">{t("logs.cache.label")}</th>
                 <th className="num log-col-rate" title={t("logs.metric.tokPerSecTitle")}>{t("logs.col.tokPerSec")}</th>
                 <th className="num log-col-cost" title={t("logs.metric.estimatedCostTitle")}>{t("logs.col.estimatedCost")}</th>
                <th className="log-col-model">{t("logs.col.model")}</th>
@@ -773,7 +778,7 @@ export default function Logs({ apiBase }: { apiBase: string }) {
             <tbody>
               {paddingTop > 0 && (
                 <tr>
-                  <td colSpan={10} className="logs-virtual-spacer" style={{ height: paddingTop }} />
+                  <td colSpan={11} className="logs-virtual-spacer" style={{ height: paddingTop }} />
                 </tr>
               )}
               {virtualRows.map(virtualRow => {
@@ -820,6 +825,7 @@ export default function Logs({ apiBase }: { apiBase: string }) {
                         : <span className="muted">{t(`logs.tokens.${log.usageStatus ?? "unreported"}`)}</span>;
                     })()}
                   </td>
+                  <td className="num"><CacheCell log={log} t={t} locale={localeTag ?? locale} /></td>
                   <td className="num mono log-col-rate">
                     {formatTokPerSecond(log.displayMetrics?.tokPerSecond, localeTag)}
                     {/* #4038: decode rate stacked under the end-to-end rate it is easy to mistake
@@ -878,7 +884,7 @@ export default function Logs({ apiBase }: { apiBase: string }) {
               })}
               {paddingBottom > 0 && (
                 <tr>
-                  <td colSpan={10} className="logs-virtual-spacer" style={{ height: paddingBottom }} />
+                  <td colSpan={11} className="logs-virtual-spacer" style={{ height: paddingBottom }} />
                 </tr>
               )}
             </tbody>
@@ -1043,6 +1049,8 @@ function LogDetailDialog({
             <p className="log-detail-notes-line muted">{t("logs.detail.route.unknown")}</p>
           )}
         </section>
+
+        <CacheDetails log={detail} t={t} locale={localeCode} />
 
         <section className="log-detail-section" aria-labelledby="log-detail-performance">
           <h4 id="log-detail-performance" className="log-detail-section-title">{t("logs.detail.section.performance")}</h4>

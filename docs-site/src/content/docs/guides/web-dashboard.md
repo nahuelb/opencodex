@@ -96,6 +96,26 @@ badge or the version value to read the full value.
 | **Storage** | Read-only CODEX_HOME disk breakdown (sessions, archives, DBs, attachments). Optional archived cleanup: preview the oldest N%, then quarantine to `CODEX_HOME/.trash` (default) or permanently delete behind an explicit checkbox. **Auto-cleanup policy** is opt-in and **default OFF** (`storageCleanupPolicy.enabled`); configure threshold/target/schedule/mode on the Storage page, or trigger **Run now**. Quarantined entries can be restored from the Storage page (JSONL + threads). Active sessions stay read-only. Cleanup and restore are refused while Codex holds the newest/active `state_*.sqlite` locked. |
 | **Stop** | Gracefully stop the proxy and installed background service, restore native Codex, and exit (`POST /api/stop`). On Windows with the Task Scheduler backend the dashboard refuses and asks you to run `ocx stop` instead: that wrapper can respawn the proxy after the task ends, and only a stop running outside this process can verify the restart window before restoring your client config. Nothing is changed when it refuses. |
 
+### Cache usage in Logs
+
+The **Cache** column shows **Hit**, **Miss**, or **Unknown**, plus the percentage of input
+reused and cached token count. Use the Cache filter alongside provider, model, time,
+status, and conversation filters.
+
+A hit requires reported cache reads above zero. A miss requires an explicit reported
+zero. Missing, estimated, invalid, or zero-input usage remains unknown. A cache write
+does not prove a hit. Older combined read/write counts are split before classification.
+
+The summary covers only the currently loaded requests after all filters. Request hit
+rate excludes unknown requests. Input reuse divides total cached-read tokens by total
+input tokens for known requests; it does not average request percentages.
+
+Open request details for exact cache-read, cache-write, and non-reused input counts.
+Non-reused input includes cache writes. Attempt outcomes appear separately and are
+not added again to request totals. When present, **Local cache diagnostics** shows
+Astra preservation and side-chat prefix decisions, including attempt-specific data.
+These local decisions do not prove a provider cache hit.
+
 ### Account selection
 
 Account selection is shared with request routing. Selecting an OAuth account takes effect on the

@@ -1,3 +1,4 @@
+import type { CacheFilter } from "./logs-cache";
 import { useRef } from "react";
 import type { TFn } from "../i18n/shared";
 import { IconX } from "../icons";
@@ -103,6 +104,13 @@ export function LogsFilterBar({
             <option value="slow">{t("logs.filter.speed.slow")}</option>
             <option value="medium">{t("logs.filter.speed.medium")}</option>
             <option value="fast">{t("logs.filter.speed.fast")}</option>
+          </select>
+        </label>
+
+        <label className="muted text-control logs-filter-field">
+          {t("logs.cache.label")}
+          <select className="input select-sm" value={filters.cache} aria-label={t("logs.cache.label")} onChange={event => onFilterChange({ ...filters, cache: event.target.value as CacheFilter })}>
+            {(["all", "hit", "miss", "unknown"] as const).map(outcome => <option key={outcome} value={outcome}>{t(`logs.cache.${outcome}`)}</option>)}
           </select>
         </label>
 

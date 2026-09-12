@@ -163,7 +163,7 @@ function expectTableLoaded(container: HTMLElement, model: string): void {
   expect(container.textContent).toContain(model);
 }
 
-test("Logs: renders the ordered ten-column layout schema", async () => {
+test("Logs: renders the ordered eleven-column layout schema", async () => {
   globalThis.fetch = (async (input) => {
     if (!String(input).includes("/api/logs")) return new Response(null, { status: 404 });
     return jsonResponse([sampleLog]);
@@ -177,6 +177,7 @@ test("Logs: renders the ordered ten-column layout schema", async () => {
   expect([...colgroup!.children].map(column => column.className)).toEqual([
     "logs-col-time",
     "logs-col-tokens",
+    "logs-col-cache",
     "logs-col-rate",
     "logs-col-cost",
     "logs-col-model",
@@ -1433,4 +1434,33 @@ test("Logs: a pending refresh reconciles the user's latest selection rather than
   } finally {
     await act(async () => { root.unmount(); });
   }
+});
+
+test("Logs: cache outcomes, filtered summary and exact detail counts share reported usage", async () => {
+  const rows = [
+    { ...sampleLog, requestId: "hit", usage: { inputTokens: 100, outputTokens: 5, cacheReadInputTokens: 90, cacheCreationInputTokens: 5 },
+      astraEffortCache: { status: "replay", stateOutcome: "committed" },
+      sideChatCache: { reason: "inherited-exact-prefix", phase: "bound-side", snapshotOutcome: "stored", matchedItems: 4, inputItems: 5 } },
+    { ...sampleLog, requestId: "miss", usage: { inputTokens: 900, outputTokens: 5, cacheReadInputTokens: 0 } },
+    { ...sampleLog, requestId: "unknown", usageStatus: "estimated", usage: { inputTokens: 100, outputTokens: 5, cacheReadInputTokens: 0 } },
+  ];
+  globalThis.fetch = (async input => String(input).includes("/api/logs") ? jsonResponse(rows) : new Response(null, { status: 404 })) as typeof fetch;
+  const { root, container } = await mountLogs();
+  await flushMicrotasks();
+  const summary = () => [...container.querySelectorAll(".logs-cache-summary dd")].map(node => node.textContent);
+  expect(summary()).toEqual(["50%", "9%", "1", "1", "1"]);
+  expect(container.querySelector(".logs-cache-hit")?.textContent).toBe("Hit · 90%");
+  for (const outcome of ["miss", "unknown", "hit"]) {
+    await changeLogSelect(container, "Cache", outcome);
+    expect(visibleRequestIds(container)).toEqual([outcome]);
+  }
+  expect(summary()).toEqual(["100%", "90%", "1", "0", "0"]);
+  await act(async () => { container.querySelector<HTMLButtonElement>(".log-detail-btn")!.click(); });
+  const detail = container.querySelector('[aria-labelledby="log-detail-cache"]')!;
+  expect(detail.textContent).toContain("Input not reused10");
+  expect(detail.textContent).toContain("replay · committed");
+  expect(detail.textContent).toContain("inherited-exact-prefix");
+  expect(detail.textContent).toContain("4 / 5");
+  expect(detail.textContent).toContain("do not prove a provider cache hit");
+  await act(async () => { root.unmount(); });
 });
