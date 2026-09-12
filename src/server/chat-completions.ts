@@ -25,7 +25,7 @@ import { estimateTokens } from "../lib/token-estimate";
 import { NoEligiblePolicyCandidateError, UnknownRoutingPolicyError, routeModel } from "../router";
 import { evidenceFromBody } from "../routing/request-evidence";
 import { resolveWireProtocolOverride } from "./adapter-resolve";
-import { resolveOpenCodeGoTransport } from "../providers/opencode-go-transport";
+import { resolveOpenCodeTransport } from "../providers/opencode-go-transport";
 import { normalizeLogConversationId, sessionLaneIdFromRequest } from "./request-log-conversation";
 import type { OcxConfig } from "../types";
 import { readJsonRequestBody, resolveInboundBodyLimitBytes } from "./request-decompress";
@@ -142,7 +142,7 @@ async function handleChatCompletionsWithBudget(
   let chatNativeRoute: ReturnType<typeof routeModel> | null = null;
   try {
     const route = routeModel(config, chatBody.model as string, evidenceFromBody(chatBody));
-    route.provider = resolveOpenCodeGoTransport(route.provider,
+    route.provider = resolveOpenCodeTransport(route.provider,
       sessionLaneIdFromRequest(req.headers) ?? normalizeLogConversationId(req.headers.get("x-opencode-session")));
     // Settle the wire once so every branch below reads the adapter this model will
     // actually use, not the provider-wide default (#404).

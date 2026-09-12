@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { providerConfigSeed } from "../../src/providers/derive";
 import { resolveOpenCodeGoTransport } from "../../src/providers/opencode-go-transport";
 import { getProviderRegistryEntry } from "../../src/providers/registry";
+import { resolveWireProtocolOverride } from "../../src/server/adapter-resolve";
 import { handleResponses } from "../../src/server/responses/core";
 import { handleChatCompletions } from "../../src/server/chat-completions";
 import { handleClaudeMessages } from "../../src/server/claude-messages";
@@ -365,5 +366,79 @@ describe("OpenCode Go session affinity (#3344)", () => {
       provider: opencodeGo({ baseUrl: "https://opencode.ai.evil.test/zen/go/v1" }),
     });
     expect(captured.headers.has(SESSION_HEADER)).toBe(false);
+  });
+});
+
+
+describe("OpenCode Zen Muse routing", () => {
+  const originalFetch = globalThis.fetch;
+  afterEach(() => { globalThis.fetch = originalFetch; });
+
+  function zen(name = "opencode-zen", overrides: Partial<OcxProviderConfig> = {}): OcxProviderConfig {
+    return { ...providerConfigSeed(getProviderRegistryEntry(name)!), apiKey: "test-key", ...overrides };
+  }
+
+  for (const providerName of ["opencode-zen", "opencode-free"]) {
+    for (const model of ["muse-spark-1.3", "muse-spark-1.2", "muse-spark-1.3-contributor-free", "muse-spark-1.2-contributor-free"]) {
+      test(`${providerName}/${model} uses Responses and stable session affinity on all ingress wires`, async () => {
+        const provider = zen(providerName);
+        const first = await captureRequest({ providerName, model, provider });
+        const continued = await captureRequest({ providerName, model, provider });
+        const sibling = await captureRequest({ providerName, model, provider, child: "child-thread-b" });
+        const chat = await captureRequest({ providerName, model, provider, nativeChat: true });
+        const claude = await captureRequest({ providerName, model, provider, claude: true, headers: codexHeaders() });
+        for (const request of [first, continued, sibling, chat, claude]) {
+          expect(request.url).toBe("https://opencode.ai/zen/v1/responses");
+          expect(request.headers.get(SESSION_HEADER)).toMatch(/^ocx_[0-9a-f]{32}$/);
+          expect(request.headers.get("user-agent")).toBe("opencodex");
+          expect(request.headers.has("x-opencode-client")).toBe(false);
+        }
+        expect(continued.headers.get(SESSION_HEADER)).toBe(first.headers.get(SESSION_HEADER));
+        expect(chat.headers.get(SESSION_HEADER)).toBe(first.headers.get(SESSION_HEADER));
+        expect(claude.headers.get(SESSION_HEADER)).toBe(first.headers.get(SESSION_HEADER));
+        expect(sibling.headers.get(SESSION_HEADER)).not.toBe(first.headers.get(SESSION_HEADER));
+        expect(provider.headers?.[SESSION_HEADER]).toBeUndefined();
+      });
+    }
+  }
+
+  test("Zen and Go keep separate affinity domains", async () => {
+    const go = await captureRequest();
+    const request = await captureRequest({ providerName: "opencode-zen", provider: zen(), model: "muse-spark-1.3-contributor-free" });
+    expect(request.headers.get(SESSION_HEADER)).not.toBe(go.headers.get(SESSION_HEADER));
+  });
+
+  test("Zen Claude metadata supplies affinity without grouping unrelated conversations", async () => {
+    const input = { providerName: "opencode-zen", provider: zen(), model: "muse-spark-1.3-contributor-free", claude: true };
+    const first = await captureRequest({ ...input, metadataUserId: "user_test_account__session_conversation-a" });
+    const continued = await captureRequest({ ...input, metadataUserId: "user_test_account__session_conversation-a" });
+    const other = await captureRequest({ ...input, metadataUserId: "user_test_account__session_conversation-b" });
+    const missing = await captureRequest(input);
+    expect(first.headers.get(SESSION_HEADER)).toMatch(/^ocx_[0-9a-f]{32}$/);
+    expect(continued.headers.get(SESSION_HEADER)).toBe(first.headers.get(SESSION_HEADER));
+    expect(other.headers.get(SESSION_HEADER)).not.toBe(first.headers.get(SESSION_HEADER));
+    expect(missing.headers.has(SESSION_HEADER)).toBe(false);
+  });
+
+  test("Zen keeps explicit operator overrides and omits absent client identity", async () => {
+    const input = { providerName: "opencode-zen", model: "muse-spark-1.3-contributor-free" };
+    const explicit = await captureRequest({ ...input, provider: zen("opencode-zen", { headers: { "X-OpenCode-Session": "operator-session", "User-Agent": "my-client" } }) });
+    expect(explicit.headers.get(SESSION_HEADER)).toBe("operator-session");
+    expect(explicit.headers.get("user-agent")).toBe("my-client");
+    const missing = await captureRequest({ ...input, provider: zen(), headers: { "content-type": "application/json" } });
+    expect(missing.headers.has(SESSION_HEADER)).toBe(false);
+  });
+
+  test("Zen wire defaults preserve explicit overrides, sibling models, and custom destinations", () => {
+    const model = "muse-spark-1.3-contributor-free";
+    const provider = zen();
+    expect(resolveWireProtocolOverride("opencode-zen", "deepseek-v4-flash-free", provider).adapter).toBe("openai-chat");
+    const override = zen("opencode-zen", { modelAdapters: { [model]: "openai-chat" } });
+    expect(resolveWireProtocolOverride("opencode-zen", model, override).adapter).toBe("openai-chat");
+    for (const baseUrl of ["https://custom.example/v1", "https://opencode.ai.evil.test/zen/v1"]) {
+      const custom = zen("opencode-zen", { baseUrl });
+      expect(resolveWireProtocolOverride("opencode-zen", model, custom).adapter).toBe("openai-chat");
+      expect(resolveOpenCodeGoTransport(custom, "conversation")).toBe(custom);
+    }
   });
 });

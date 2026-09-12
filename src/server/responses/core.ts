@@ -274,7 +274,7 @@ import {
 } from "../../providers/key-failover";
 import { shouldAttemptImageTierRetry } from "../image-retry";
 import { isXaiResponsesDestination, resolveProviderTransport } from "../../providers/xai-transport";
-import { resolveOpenCodeGoTransport } from "../../providers/opencode-go-transport";
+import { resolveOpenCodeTransport } from "../../providers/opencode-go-transport";
 import type { WsData } from "../ws-bridge";
 import {
   codexAccountSelectionForTurn,
@@ -2453,7 +2453,7 @@ async function applyFinalRouteRequestNormalization(args: {
 
   // Settle the wire once so logging, fast-mode, auth, and sidecars read the adapter
   // this request will actually use (#404).
-  route.provider = resolveOpenCodeGoTransport(route.provider,
+  route.provider = resolveOpenCodeTransport(route.provider,
     sessionLaneIdFromRequest(req.headers) ?? normalizeLogConversationId(req.headers.get("x-opencode-session")));
   route.provider = resolveWireProtocolOverride(route.providerName, route.modelId, route.provider, inboundWire);
   if (preserveAnthropicResponseModel) parsed._responseModelId = responseModelId;

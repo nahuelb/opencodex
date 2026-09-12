@@ -141,11 +141,6 @@ describe("opencode-zen rate-limit guidance (#1145)", () => {
   });
 });
 
-/**
- * Zen closed the keyless tier to non-OpenCode clients. The gate is the mere presence of
- * `x-opencode-session`, so opencodex could pass it by inventing a value; it does not, and the
- * user-facing failure has to say that rather than leaking `MissingSessionID` through.
- */
 describe("opencode-free keyless tier lock-in (#4121)", () => {
   /** Verbatim upstream body from the issue, as the Responses wire forwards it. */
   const RAW_UPSTREAM = String.raw`{"type":"error","error":{"type":"MissingSessionID","message":"Error from provider (Console): OpenCode's free tier can only be used in OpenCode"}}`;
@@ -155,7 +150,7 @@ describe("opencode-free keyless tier lock-in (#4121)", () => {
     adapter: "openai-chat",
   };
 
-  test("registry note states the gate, the refusal to impersonate, and the keyed alternative", () => {
+  test("registry note explains session identity and upstream availability", () => {
     const note = PROVIDER_REGISTRY.find(e => e.id === "opencode-free")?.note?.toLowerCase();
     expect(note).toBeDefined();
     expect(note).toContain("x-opencode-session");
@@ -180,7 +175,7 @@ describe("opencode-free keyless tier lock-in (#4121)", () => {
     expect(isOpenCodeZenFreeTierLockIn("Provider error 500: boom", "server_error")).toBe(false);
   });
 
-  test("the client error explains the gate and names the supported keyed route", () => {
+  test("the client error explains missing session identity", () => {
     const enriched = enrichOpenCodeZenFreeTierMessage(
       `Provider error 400: ${RAW_UPSTREAM}`,
       FREE_TIER_ROUTE,
@@ -189,8 +184,8 @@ describe("opencode-free keyless tier lock-in (#4121)", () => {
     expect(enriched).toContain("opencode-zen");
     expect(enriched).toContain("https://opencode.ai/auth");
     expect(enriched).toContain("https://opencode.ai/docs/zen/");
-    // The user is told opencodex declines to impersonate, not that the request merely failed.
-    expect(enriched).toContain("does not send a fabricated OpenCode session header");
+    expect(enriched).toContain("requires a stable conversation session");
+    expect(enriched).toContain("alone does not fix missing session identity");
   });
 
   test("enrichment is scoped to Zen destinations and to this error", () => {

@@ -4059,13 +4059,11 @@ describe("provider management validation", () => {
     // relies on.
     expect((await patch("opencode-free", { headers: null }))?.status).toBe(200);
     expect(liveConfig.providers["opencode-free"].headers).toEqual({
-      "User-Agent": "opencode",
-      "x-opencode-client": "desktop",
+      "User-Agent": "opencodex",
     });
     const saved = JSON.parse(readFileSync(join(TEST_DIR, "config.json"), "utf8")) as OcxConfig;
     expect(saved.providers["opencode-free"]?.headers).toEqual({
-      "User-Agent": "opencode",
-      "x-opencode-client": "desktop",
+      "User-Agent": "opencodex",
     });
   });
   test("concurrent provider PATCHes serialize mixed fields and per-model soft budgets", async () => {

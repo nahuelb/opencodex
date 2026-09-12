@@ -433,6 +433,12 @@ for both full-history-plus-ID and delta continuations without weakening identity
 summaries and opaque blobs keep their existing cache representation. It does not change streaming selection or Chat
 model routes. Go fixtures cover Luna, Grok and Muse against both response formats.
 
+Zen's Muse Spark 1.3 and 1.2 models, including `-contributor-free`, use registry Responses
+wire defaults. Zen and Free presets identify as `opencodex` and share the opaque session
+mechanism below with a separate Zen hash domain. Client session headers and Claude metadata
+supply identity; shared prompt cohorts never substitute for a conversation. Missing-session
+errors explain this requirement instead of suggesting that an API key alone fixes it.
+
 The canonical OpenCode Go transport also derives `x-opencode-session` from the existing hashed
 session lane before per-model wire selection. One conversation keeps one opaque affinity value
 across Responses, Chat, retries, and key rotation, while sibling subagents remain distinct. An

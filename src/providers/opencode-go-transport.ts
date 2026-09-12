@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import type { OcxProviderConfig } from "../types";
 import { registryEntryForProviderDestination } from "./registry";
 
-export const OPENCODE_GO_SESSION_HEADER = "x-opencode-session";
+export const OPENCODE_SESSION_HEADER = "x-opencode-session";
+export const OPENCODE_GO_SESSION_HEADER = OPENCODE_SESSION_HEADER;
 
 function hasHeaderCaseInsensitive(
   headers: Record<string, string> | undefined,
@@ -12,30 +13,40 @@ function hasHeaderCaseInsensitive(
   return Object.keys(headers ?? {}).some(key => key.toLowerCase() === target);
 }
 
-/** Derive a provider-scoped opaque value without exposing Codex task or subagent ids. */
-export function deriveOpenCodeGoSessionId(sessionLane: string): string {
+function deriveOpenCodeSessionId(sessionLane: string, providerId: string): string {
   const digest = createHash("sha256")
-    .update("opencodex/opencode-go/session/v1\0")
+    .update(`opencodex/${providerId}/session/v1\0`)
     .update(sessionLane)
     .digest("hex")
     .slice(0, 32);
   return `ocx_${digest}`;
 }
 
-/** Add per-conversation Go affinity only to the canonical fixed-key destination. */
-export function resolveOpenCodeGoTransport<T extends OcxProviderConfig>(
+export function deriveOpenCodeGoSessionId(sessionLane: string): string {
+  return deriveOpenCodeSessionId(sessionLane, "opencode-go");
+}
+
+export function openCodeSessionProviderId(provider: OcxProviderConfig): string | undefined {
+  const id = registryEntryForProviderDestination(provider)?.id;
+  return id === "opencode-go" || id === "opencode-zen" ? id : undefined;
+}
+
+export function resolveOpenCodeTransport<T extends OcxProviderConfig>(
   provider: T,
   sessionLane: string | undefined,
 ): T {
-  if (registryEntryForProviderDestination(provider)?.id !== "opencode-go") return provider;
+  const providerId = openCodeSessionProviderId(provider);
+  if (!providerId) return provider;
   if (!sessionLane) return provider;
-  if (hasHeaderCaseInsensitive(provider.headers, OPENCODE_GO_SESSION_HEADER)) return provider;
+  if (hasHeaderCaseInsensitive(provider.headers, OPENCODE_SESSION_HEADER)) return provider;
 
   return {
     ...provider,
     headers: {
       ...(provider.headers ?? {}),
-      [OPENCODE_GO_SESSION_HEADER]: deriveOpenCodeGoSessionId(sessionLane),
+      [OPENCODE_SESSION_HEADER]: deriveOpenCodeSessionId(sessionLane, providerId),
     },
   };
 }
+
+export const resolveOpenCodeGoTransport = resolveOpenCodeTransport;

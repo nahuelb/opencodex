@@ -516,6 +516,11 @@ const META_MUSE_REASONING_EFFORT_MAP: Record<string, string> = Object.fromEntrie
 /** Both Muse Spark 1.3 tiers publish a 1,048,576-token window (dev.meta.ai/docs/models). */
 const META_MUSE_CONTEXT_WINDOW = 1_048_576;
 const META_MUSE_MODELS = ["muse-spark-1.3", "muse-spark-1.3-contributor"];
+const OPENCODE_ZEN_MUSE_MODELS = [
+  "muse-spark-1.3", "muse-spark-1.2",
+  "muse-spark-1.3-contributor-free", "muse-spark-1.2-contributor-free",
+];
+
 /**
  * Daybreak program aliases. These `-latest` ids are the stable contract: OpenAI repoints
  * them at newer snapshots over time (red -> gpt-5.6-cyber, blue -> gpt-5.6-sol as of
@@ -3001,12 +3006,17 @@ export const PROVIDER_REGISTRY: readonly ProviderRegistryEntry[] = [
     // Same Zen gateway as opencode-free: the DeepSeek vision preview id
     // (merges into deepseek-v4-flash later).
     modelContextWindows: {
+      ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, META_MUSE_CONTEXT_WINDOW])),
       [DEEPSEEK_VISION_PREVIEW_MODEL]: 1_048_576,
     },
     modelInputModalities: {
+      ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, ["text", "image"] as ["text", "image"]])),
       [DEEPSEEK_VISION_PREVIEW_MODEL]: ["text", "image"],
     },
     noVisionModels: [...OPENCODE_ZEN_TEXT_ONLY_MODELS, ...DEEPSEEK_THINKING_MODELS],
+    modelWireDefaults: Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, "openai-responses" as const])),
+    staticHeaders: { "User-Agent": "opencodex" },
+    preserveCustomDestination: true,
   },
   { id: "vercel-ai-gateway", label: "Vercel AI Gateway", baseUrl: "https://ai-gateway.vercel.sh/v1", adapter: "openai-chat", authKind: "key", dashboardUrl: "https://vercel.com/dashboard" },
   {
@@ -3018,35 +3028,27 @@ export const PROVIDER_REGISTRY: readonly ProviderRegistryEntry[] = [
     keyOptional: true,
     featured: true,
     liveModels: true,
-    note: "No key needed, but OpenCode now gates this tier to its own client: Zen refuses any request that arrives without an x-opencode-session header (error type MissingSessionID, \"OpenCode's free tier can only be used in OpenCode\"). opencodex does not mint that header or claim an OpenCode client identity, because no upstream contract authorizes a third-party agent to present itself as OpenCode. Until OpenCode publishes a third-party integration path for the keyless tier, use the keyed opencode-zen provider instead (https://opencode.ai/auth). Quota figures for when the tier admitted a request: OpenCode advertises about 200 Big Pickle/free-model requests per 5 hours, and the same Zen gateway can short-window rate-limit free models at roughly 15-20 requests/minute, and may return generic 429s without Retry-After (opencodex synthesizes backoff only when that header is omitted). Free models are discovered live from Zen. Data use: per OpenCode's Zen docs (https://opencode.ai/docs/zen/), prompts sent to free models may be retained and used for training/improvement — do not send confidential material through this provider.",
+    note: "Key-optional OpenCode Zen free models. OpenCodex identifies itself and derives x-opencode-session from a stable conversation ID. Requests without session identity can receive MissingSessionID; adding a key alone does not supply it. Upstream availability and account restrictions still apply. OpenCode advertises about 200 Big Pickle/free-model requests per 5 hours; short-window limits can be roughly 15-20 requests/minute. When Retry-After is absent, OpenCodex adds a backoff hint. Use opencode-zen for a Zen API key. Free-model prompts may be retained for training. Docs: https://opencode.ai/docs/zen/.",
     dashboardUrl: "https://opencode.ai",
-    staticHeaders: {
-      // Zen answers a bare runtime User-Agent (Bun/x.y.z) more aggressively than a client
-      // that identifies itself, which is what the 429 in #2067 traced to. The value is
-      // deliberately unversioned: a pinned "opencode-cli/<version>" is a claim about an
-      // install we do not have and goes stale on the vendor's schedule, not ours.
-      // Corroboration, not authority: OmniRoute — an independent open-source broker against
-      // the same Zen upstream — defaults to exactly this pair (userAgent "opencode", client
-      // "desktop") in open-sse/executors/opencode.ts, and got there by RETREATING from its
-      // own earlier "opencode-cli/1.0.0" pin. An operator can still override either value
-      // through the provider headers API; user headers win case-insensitively at route time.
-      "User-Agent": "opencode",
-      "x-opencode-client": "desktop",
-    },
+    staticHeaders: { "User-Agent": "opencodex" },
     modelReasoningEfforts: Object.fromEntries(OPENCODE_FREE_DEEPSEEK_MODELS.map(id => [id, deepseekThinkingEffortsFor(id)])),
     modelReasoningEffortMap: Object.fromEntries(OPENCODE_FREE_DEEPSEEK_MODELS.map(id => [id, deepseekReasoningMapFor(id)])),
     preserveReasoningContentModels: OPENCODE_FREE_DEEPSEEK_MODELS,
     // The DeepSeek vision preview id is preemptive metadata for when Zen starts
     // serving it (merges into v4-flash later).
     modelContextWindows: {
+      ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, META_MUSE_CONTEXT_WINDOW])),
       [DEEPSEEK_VISION_PREVIEW_MODEL]: 1_048_576,
     },
     modelInputModalities: {
+      ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, ["text", "image"] as ["text", "image"]])),
       [DEEPSEEK_VISION_PREVIEW_MODEL]: ["text", "image"],
     },
     // Same Zen roster behind the same base URL, so it carries the same measured
     // text-only list rather than only its DeepSeek member (#1043).
     noVisionModels: OPENCODE_ZEN_TEXT_ONLY_MODELS,
+    modelWireDefaults: Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, "openai-responses" as const])),
+    preserveCustomDestination: true,
   },
   { id: "xiaomi", label: "Xiaomi MiMo", baseUrl: "https://api.xiaomimimo.com/anthropic", adapter: "anthropic", authKind: "key", dashboardUrl: "https://xiaomimimo.com", defaultModel: "mimo-v2.5-pro" },
   // Xiaomi's public OpenAI-compatible endpoint is a distinct transport from both the Anthropic
