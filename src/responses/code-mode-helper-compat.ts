@@ -31,6 +31,7 @@ function unwrapPatchInput(value: string): string {
  */
 export function compileCodeModeHelperInput(argumentsText: unknown, toolName: string): string {
   if (typeof argumentsText !== "string") return "";
+  if (toolName.startsWith("default.")) toolName = toolName.slice("default.".length);
   if (toolName === "apply_patch") {
     const patch = normalizeApplyPatchDelimiters(unwrapPatchInput(argumentsText));
     return `const result = await tools.apply_patch(${JSON.stringify(patch)});\ntext(result);`;
@@ -50,6 +51,9 @@ export function compileCodeModeHelperInput(argumentsText: unknown, toolName: str
   ) {
     args.cmd = args.command;
     delete args.command;
+  }
+  if (toolName === "view_image") {
+    return `const result = await tools.view_image(${JSON.stringify(args)});\nimage(result.image_url, result.detail);`;
   }
   if (toolName === "write_stdin") {
     return `const result = await tools.write_stdin(${JSON.stringify(args)});\ntext(result);`;

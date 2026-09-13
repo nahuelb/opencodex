@@ -67,3 +67,5 @@ Claude replay carries [Go conversation affinity](../data-planes/inbound-compat.m
 privately to final dispatch; preliminary route selection does not inject Go-only headers.
 
 Devin CLI credential path composition in `src/oauth/devin-cli.ts` follows the selected platform: Windows uses Win32 APPDATA paths, other platforms use POSIX XDG-data paths. The explicit absolute override remains verbatim; credential parsing and login behavior are unchanged.
+
+Routed image helper repair follows the [code-mode image contract](../transports/responses.md#code-mode-image-helpers).

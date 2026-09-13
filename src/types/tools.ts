@@ -47,8 +47,8 @@ export function dottedToolName(namespace: string | undefined, name: string): str
  *
  * Codex's code-mode shell tool is declared as `exec` (a freeform custom tool whose own
  * description mentions the nested `await tools.exec_command(...)` helper). Some routed providers
- * echo that helper name as the tool-call name, emitting `exec_command`, `write_stdin`, or
- * `apply_patch` instead of the declared `exec`. Accept these nested helper names only when the
+ * echo shell, stdin, patch, or image helper names instead of the declared `exec`.
+ * Accept these nested helper names only when the
  * request catalog actually declares `exec` and does not itself declare the emitted name (an MCP
  * server may legitimately advertise one under its own namespace).
  */
@@ -56,6 +56,7 @@ const LEGACY_SHELL_BRIDGE_TOOL_NAMES = ["exec_command", "shell_command"] as cons
 const CODE_MODE_HELPER_TOOL_NAMES = [
   ...LEGACY_SHELL_BRIDGE_TOOL_NAMES,
   "write_stdin",
+  "view_image",
   "apply_patch",
 ] as const;
 
@@ -93,7 +94,9 @@ export function normalizeDeclaredToolName(
     const bareDeclared = declaredBare ?? declared;
     if (
       bare.length > 0
-      && bareDeclared.has(bare)
+      && (bareDeclared.has(bare)
+        || (declaresCodeModeExec(declared)
+          && (CODE_MODE_HELPER_TOOL_NAMES as readonly string[]).includes(bare)))
       && !declared.has("default." + bare)
       && !declared.has("default__" + bare)
     ) {

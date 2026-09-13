@@ -2001,7 +2001,7 @@ describe("empty and absent tool catalogs", () => {
       namespace: "mcp__functions",
     });
 
-    for (const name of ["apply_patch", "exec_command", "shell_command", "write_stdin"]) {
+    for (const name of ["apply_patch", "exec_command", "shell_command", "write_stdin", "view_image", "default.view_image"]) {
       const refused = await post(
         false,
         tools,
@@ -2299,3 +2299,13 @@ describe("xAI hosted-call authorization through handleResponses", () => {
     expect(body.error.message).toContain('undeclared client tool "x_keyword_search"');
   });
 });
+
+for (const item of [
+  { type: "function_call", name: "default__view_image" },
+  { type: "function_call", name: "view_image", namespace: "default" },
+  { type: "function_call", name: "view_image", namespace: "mcp__foo" },
+]) {
+  test(`image helper does not infer undeclared namespace ${JSON.stringify(item)}`, () => {
+    expect(undeclaredToolCallNameInResponse({ output: [item] }, new Set(["exec"]))).toBe(item.name);
+  });
+}

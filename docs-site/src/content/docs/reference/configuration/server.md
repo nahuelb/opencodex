@@ -676,3 +676,11 @@ This reads the recent usage ledger once and returns separate Astra effort-cache 
 summaries. An optional second argument selects an exact request ID within that window. One request
 can appear in both feature groups, so do not add their token totals together. The groups describe
 feature decisions and observed cache reads; they do not attribute a hit to either feature.
+
+## Routed image inspection in Code Mode
+
+When Codex exposes its tools through `exec`, routed models can inspect local images through
+`tools.view_image`. OpenCodex repairs bare `view_image` and invented `default.view_image`
+helper calls into `exec` calls that return the image at the requested detail level.
+This compatibility repair is automatic. It does not enable undeclared tools in ordinary catalogs
+or change explicitly declared tool identities.

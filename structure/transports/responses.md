@@ -530,3 +530,12 @@ see [Combo editor routing quota](../gui-and-management-api.md#combo-editor-routi
 
 Claude replay carries [Go conversation affinity](../data-planes/inbound-compat.md#claude-affinity-at-final-go-dispatch)
 privately to final dispatch; preliminary route selection does not inject Go-only headers.
+
+### Code-mode image helpers
+
+`src/responses/code-mode-helper-compat.ts` compiles routed `view_image` helper calls into
+`exec` JavaScript that calls `tools.view_image` and emits `image(result.image_url, result.detail)`.
+Bare helpers and invented `default.` prefixes use the existing code-mode catalog gate.
+Explicit tool declarations keep their identity; foreign namespaces and catalogs without bare
+`exec` do not gain helper access. Arguments remain serialized data, and original image detail survives.
+Native Responses JSON/SSE and translated adapter output share this helper compiler.

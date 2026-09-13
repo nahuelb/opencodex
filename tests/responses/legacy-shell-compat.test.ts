@@ -113,3 +113,36 @@ describe("code-mode helper compatibility", () => {
     }
   });
 });
+
+for (const name of ["view_image", "default.view_image"]) {
+  test(`${name} emits image data and preserves arguments`, async () => {
+    const args = { path: "/tmp/'); throw new Error('escaped') //", detail: "original" };
+    const result = { image_url: "data:image/png;base64,fixture", detail: "original" };
+    let received: unknown;
+    let emitted: unknown[] = [];
+    const run = new AsyncFunction("tools", "image", compileCodeModeHelperInput(JSON.stringify(args), name));
+    await run({ view_image: async (value: unknown) => { received = value; return result; } },
+      (...values: unknown[]) => { emitted = values; });
+    expect(received).toEqual(args);
+    expect(emitted).toEqual([result.image_url, "original"]);
+  });
+}
+
+for (const helper of ["exec_command", "shell_command", "write_stdin", "apply_patch"]) {
+  test(`default.${helper} keeps the existing helper compiler`, () => {
+    const args = helper === "apply_patch" ? "*** Begin Patch\n*** End Patch" : '{"command":"pwd","session_id":17}';
+    expect(compileCodeModeHelperInput(args, `default.${helper}`)).toBe(compileCodeModeHelperInput(args, helper));
+  });
+}
+
+for (const input of ['not-json', '[]', 'null', '{"path":"/tmp/chart.png"}']) {
+  test(`image helper passes invalid or optional arguments to the nested validator: ${input}`, async () => {
+    let received: unknown;
+    let expected: unknown = input;
+    try { expected = JSON.parse(input); } catch {}
+    const run = new AsyncFunction("tools", "image", compileCodeModeHelperInput(input, "view_image"));
+    await expect(run({ view_image: async (value: unknown) => { received = value; throw new Error("fixture validation"); } },
+      () => { throw new Error("unexpected image output"); })).rejects.toThrow("fixture validation");
+    expect(received).toEqual(expected);
+  });
+}

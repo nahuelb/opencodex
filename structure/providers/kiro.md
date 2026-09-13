@@ -59,3 +59,5 @@ positive value overwrites an earlier one.
 Spend arrives in `meteringEvent` as **credits, not tokens**. No captured response carried
 `tokenUsage` on any event, which is why Kiro usage stays estimated; `meteringEvent` is currently
 ignored because a credit is not a token count.
+
+Routed image helper repair follows the [code-mode image contract](../transports/responses.md#code-mode-image-helpers).

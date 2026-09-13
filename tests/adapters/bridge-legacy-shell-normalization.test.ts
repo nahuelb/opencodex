@@ -107,3 +107,30 @@ describe("bridge normalizes code-mode helper names against the declared catalog"
     expect(sse).toContain('"arguments":"{\\"cmd\\":\\"ls\\"}"');
   });
 });
+
+for (const name of ["view_image", "default.view_image"]) {
+  test(`${name} uses code-mode image output`, async () => {
+    const sse = await drain(bridgeToResponsesSSE(
+      toolTurn(name, JSON.stringify({ path: "/tmp/chart.png", detail: "original" })),
+      "fixture-model", undefined, new Set(["exec"]), undefined, undefined, 50_000,
+      { declaredToolNames: new Set(["exec"]) },
+    ));
+    expect(sse).not.toContain("undeclared client tool");
+    expect(sse).toContain('"name":"exec"');
+    expect(sse).toContain("await tools.view_image(");
+    expect(sse).toContain("image(result.image_url, result.detail)");
+    expect(sse).not.toContain("await tools.exec_command(");
+  });
+}
+
+for (const declared of [["exec", "view_image"], ["exec", "default.view_image"], ["exec", "exec_command"]]) {
+  test(`image helper respects explicit catalog ${declared.join(",")}`, async () => {
+    const name = declared.includes("default.view_image") ? "default.view_image" : "view_image";
+    const sse = await drain(bridgeToResponsesSSE(toolTurn(name, '{"path":"/tmp/chart.png"}'),
+      "fixture-model", undefined, new Set(["exec"]), undefined, undefined, 50_000,
+      { declaredToolNames: new Set(declared) }));
+    if (declared.includes("exec_command")) expect(sse).toContain("undeclared client tool");
+    else expect(sse).toContain(JSON.stringify({ name }).slice(1, -1));
+    expect(sse).not.toContain("await tools.view_image(");
+  });
+}
