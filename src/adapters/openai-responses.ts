@@ -1,6 +1,7 @@
 import type { AstraEffortCacheMetrics } from "../usage/astra-effort-cache";
 import { applyAstraEffortCache, supportsAstraEffortCache } from "./astra-effort-cache";
 import { normalizeRoutedAgentMessages } from "./routed-agent-messages";
+import { stripBracketedModelSuffix } from "./openai-chat";
 import { normalizeOpenCodeGoAdditionalTools } from "./opencode-go-additional-tools";
 import { isXaiResponsesDestination } from "../providers/xai-transport";
 import { createHash } from "node:crypto";
@@ -2563,7 +2564,21 @@ export function createResponsesPassthroughAdapter(provider: OcxProviderConfig): 
         finalBody = cacheDecision.body;
         headers = cacheDecision.headers;
       }
-      const body = JSON.stringify(finalBody);
+      // The Responses adapter is passthrough: it forwards `parsed._rawBody` rather than
+      // rebuilding the body from `parsed.modelId`, and the router writes the routed id into
+      // that raw body. So a provider whose upstream rejects bracketed ids has to be honoured
+      // here, on the serialized body, not on the parsed selector. One place covers both the
+      // HTTP and the WebSocket outbound, because the WS path transports this same request
+      // instead of rebuilding it.
+      const body = JSON.stringify(
+        provider.modelSuffixBracketStrip
+          && finalBody !== null
+          && typeof finalBody === "object"
+          && !Array.isArray(finalBody)
+          && typeof (finalBody as { model?: unknown }).model === "string"
+          ? { ...(finalBody as Record<string, unknown>), model: stripBracketedModelSuffix((finalBody as { model: string }).model) }
+          : finalBody,
+      );
       const releaseBodyObservation = translatorBudget.observeExternallyCapped(
         "passthrough_serialization",
         new TextEncoder().encode(body).byteLength,

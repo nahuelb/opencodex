@@ -31,20 +31,28 @@ export function openCodeSessionProviderId(provider: OcxProviderConfig): string |
   return id === "opencode-go" || id === "opencode-zen" ? id : undefined;
 }
 
+/**
+ * Add affinity only to canonical fixed-key OpenCode destinations. Go requires a session on every
+ * request, so it falls back to the caller's request-scoped lane, which stays stable across retries.
+ * Zen accepts requests without one, so it uses real conversation identity only and otherwise omits
+ * the header rather than grouping unrelated requests.
+ */
 export function resolveOpenCodeTransport<T extends OcxProviderConfig>(
   provider: T,
   sessionLane: string | undefined,
+  allocatedSessionLane?: string,
 ): T {
   const providerId = openCodeSessionProviderId(provider);
   if (!providerId) return provider;
-  if (!sessionLane) return provider;
+  const lane = providerId === "opencode-go" ? sessionLane ?? allocatedSessionLane : sessionLane;
+  if (!lane) return provider;
   if (hasHeaderCaseInsensitive(provider.headers, OPENCODE_SESSION_HEADER)) return provider;
 
   return {
     ...provider,
     headers: {
       ...(provider.headers ?? {}),
-      [OPENCODE_SESSION_HEADER]: deriveOpenCodeSessionId(sessionLane, providerId),
+      [OPENCODE_SESSION_HEADER]: deriveOpenCodeSessionId(lane, providerId),
     },
   };
 }
