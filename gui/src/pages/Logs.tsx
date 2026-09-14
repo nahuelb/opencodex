@@ -114,7 +114,8 @@ type AttemptRecoveryKind =
   | "rate-limit-429"
   | "anthropic-oauth-429"
   | "image-413"
-  | "empty-completion";
+  | "empty-completion"
+  | "console-go-upload-retry";
 
 interface LogAttempt extends CacheDiagnostics {
   ordinal: number;
@@ -308,6 +309,7 @@ const RECOVERY_KIND_KEYS = {
   "anthropic-oauth-429": "logs.detail.attempt.recovery.anthropicOauth429",
   "image-413": "logs.detail.attempt.recovery.image413",
   "empty-completion": "logs.detail.attempt.recovery.emptyCompletion",
+  "console-go-upload-retry": "logs.detail.attempt.recovery.consoleGoUpload",
 } as const satisfies Record<AttemptRecoveryKind, string>;
 
 /** Map a metric-unavailable reason to its i18n key. */

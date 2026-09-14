@@ -292,7 +292,7 @@ async function handleChatCompletionsWithBudget(
   try {
     internalBodyJson = JSON.stringify(internalBody);
     translatorBudget.chargeRetained(
-      new TextEncoder().encode(internalBodyJson).byteLength,
+      Buffer.byteLength(internalBodyJson, "utf8"),
       { kind: "request_copies" },
     );
   } catch (err) {

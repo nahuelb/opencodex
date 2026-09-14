@@ -112,37 +112,138 @@ describe("code-mode helper compatibility", () => {
       expect(received).toEqual(input === "[]" ? [] : input);
     }
   });
+
+  test("view_image compiles to tools.view_image and forwards image_url to image()", async () => {
+    const source = compileCodeModeHelperInput(
+      JSON.stringify({ path: "/tmp/shot.png", detail: "high" }),
+      "default.view_image",
+    );
+    let received: unknown;
+    let surfaced: unknown;
+    const run = new AsyncFunction("tools", "text", "image", source);
+
+    await run(
+      {
+        view_image: async (args: unknown) => {
+          received = args;
+          return { image_url: "data:image/png;base64,AAAA" };
+        },
+      },
+      () => { throw new Error("image result leaked into text output"); },
+      (value: unknown) => { surfaced = value; },
+    );
+
+    expect(received).toEqual({ path: "/tmp/shot.png", detail: "high" });
+    expect(surfaced).toBe("data:image/png;base64,AAAA");
+  });
+
+  test("view_image maps file_path/file/image_path aliases onto path", async () => {
+    for (const alias of ["file_path", "file", "image_path"]) {
+      const source = compileCodeModeHelperInput(
+        JSON.stringify({ [alias]: "/tmp/alias.png" }),
+        "view_image",
+      );
+      let received: unknown;
+      const run = new AsyncFunction("tools", "text", "image", source);
+      await run(
+        {
+          view_image: async (args: unknown) => {
+            received = args;
+            return {};
+          },
+        },
+        () => {},
+        () => {},
+      );
+      expect(received).toEqual({ path: "/tmp/alias.png" });
+    }
+  });
+
+  test("view_image keeps explicit path precedence and removes provider aliases", async () => {
+    const source = compileCodeModeHelperInput(
+      JSON.stringify({ path: "/tmp/right.png", file_path: "/tmp/wrong.png", detail: "original" }),
+      "view_image",
+    );
+    let received: unknown;
+    const run = new AsyncFunction("tools", "text", "image", source);
+    await run(
+      {
+        view_image: async (args: unknown) => {
+          received = args;
+          return {};
+        },
+      },
+      () => {},
+      () => {},
+    );
+    expect(received).toEqual({ path: "/tmp/right.png", detail: "original" });
+  });
+
+  test("view_image aliases use deterministic precedence when providers send more than one", async () => {
+    const source = compileCodeModeHelperInput(
+      JSON.stringify({
+        file_path: "/tmp/file-path.png",
+        file: "/tmp/file.png",
+        image_path: "/tmp/image-path.png",
+      }),
+      "view_image",
+    );
+    let received: unknown;
+    const run = new AsyncFunction("tools", "text", "image", source);
+    await run(
+      {
+        view_image: async (args: unknown) => {
+          received = args;
+          return {};
+        },
+      },
+      () => {},
+      () => {},
+    );
+
+    expect(received).toEqual({ path: "/tmp/file-path.png" });
+  });
+
+  test("view_image without image_url still returns the host result", async () => {
+    const source = compileCodeModeHelperInput(
+      JSON.stringify({ path: "/tmp/missing.png" }),
+      "view_image",
+    );
+    let surfaced = false;
+    let output: unknown;
+    const run = new AsyncFunction("tools", "text", "image", source);
+    await run(
+      {
+        view_image: async () => ({ error: "not found" }),
+      },
+      (value: unknown) => { output = value; },
+      () => { surfaced = true; },
+    );
+    expect(surfaced).toBe(false);
+    expect(output).toEqual({ error: "not found" });
+  });
+
+  test("invalid view_image input remains data instead of becoming JavaScript", async () => {
+    const input = "{not-json`); throw new Error('escaped') //";
+    let received: unknown;
+    const run = new AsyncFunction(
+      "tools",
+      "text",
+      "image",
+      compileCodeModeHelperInput(input, "view_image"),
+    );
+
+    await run(
+      {
+        view_image: async (args: unknown) => {
+          received = args;
+          return { error: "invalid input" };
+        },
+      },
+      () => {},
+      () => {},
+    );
+
+    expect(received).toBe(input);
+  });
 });
-
-for (const name of ["view_image", "default.view_image"]) {
-  test(`${name} emits image data and preserves arguments`, async () => {
-    const args = { path: "/tmp/'); throw new Error('escaped') //", detail: "original" };
-    const result = { image_url: "data:image/png;base64,fixture", detail: "original" };
-    let received: unknown;
-    let emitted: unknown[] = [];
-    const run = new AsyncFunction("tools", "image", compileCodeModeHelperInput(JSON.stringify(args), name));
-    await run({ view_image: async (value: unknown) => { received = value; return result; } },
-      (...values: unknown[]) => { emitted = values; });
-    expect(received).toEqual(args);
-    expect(emitted).toEqual([result.image_url, "original"]);
-  });
-}
-
-for (const helper of ["exec_command", "shell_command", "write_stdin", "apply_patch"]) {
-  test(`default.${helper} keeps the existing helper compiler`, () => {
-    const args = helper === "apply_patch" ? "*** Begin Patch\n*** End Patch" : '{"command":"pwd","session_id":17}';
-    expect(compileCodeModeHelperInput(args, `default.${helper}`)).toBe(compileCodeModeHelperInput(args, helper));
-  });
-}
-
-for (const input of ['not-json', '[]', 'null', '{"path":"/tmp/chart.png"}']) {
-  test(`image helper passes invalid or optional arguments to the nested validator: ${input}`, async () => {
-    let received: unknown;
-    let expected: unknown = input;
-    try { expected = JSON.parse(input); } catch {}
-    const run = new AsyncFunction("tools", "image", compileCodeModeHelperInput(input, "view_image"));
-    await expect(run({ view_image: async (value: unknown) => { received = value; throw new Error("fixture validation"); } },
-      () => { throw new Error("unexpected image output"); })).rejects.toThrow("fixture validation");
-    expect(received).toEqual(expected);
-  });
-}

@@ -1,7 +1,7 @@
 import type { CodexAccountMode, FastWire, OcxProviderConfig } from "../types";
 import { fastWireDeclarationError } from "./fastwire";
 import { KIRO_MODELS, KIRO_MODEL_CONTEXT_WINDOWS, KIRO_MODEL_REASONING_EFFORTS } from "./kiro-models";
-import { DEVIN_MODEL_CONTEXT_WINDOWS } from "../adapters/devin/live-models";
+import { DEVIN_MODEL_CONTEXT_WINDOWS, DEVIN_MODEL_EFFORTS, DEVIN_DEFAULT_EFFORTS } from "../adapters/devin/live-models";
 import { ANTIGRAVITY_MODELS, ANTIGRAVITY_MODEL_CONTEXT_WINDOWS, ANTIGRAVITY_MODEL_EFFORTS, ANTIGRAVITY_MODEL_INPUT_MODALITIES } from "./antigravity-models";
 import type { ProviderBaseUrlChoice } from "./base-url-choices";
 import {
@@ -356,6 +356,10 @@ export interface ProviderRegistryEntry {
   autoToolChoiceOnlyModels?: string[];
   preserveReasoningContentModels?: string[];
   requiresReasoningPlaceholderModels?: string[];
+  /**
+   * Opt this provider into visible thinking summaries (see OcxProviderConfig.showThinkingSummary).
+   */
+  showThinkingSummary?: boolean;
   reasoningSplitModels?: string[];
   reasoningDetailsModels?: string[];
   thinkingToggleModels?: string[];
@@ -380,7 +384,7 @@ export type ProviderConfigSeed = Pick<
   | "modelMaxInputTokens" | "defaultMaxOutputTokens" | "modelMaxOutputTokens"
   | "reasoningEfforts" | "modelReasoningEfforts" | "modelDefaultReasoningEfforts" | "reasoningEffortMap" | "modelReasoningEffortMap" | "reasoningWireFormat"
   | "noVisionModels" | "noReasoningModels" | "noTemperatureModels" | "noTopPModels" | "noPenaltyModels"
-  | "autoToolChoiceOnlyModels" | "preserveReasoningContentModels" | "requiresReasoningPlaceholderModels" | "reasoningSplitModels" | "reasoningDetailsModels" | "thinkingToggleModels" | "thinkingBudgetModels" | "escapeBuiltinToolNames" | "openaiChatEofTolerance"
+  | "autoToolChoiceOnlyModels" | "preserveReasoningContentModels" | "requiresReasoningPlaceholderModels" | "reasoningSplitModels" | "reasoningDetailsModels" | "thinkingToggleModels" | "thinkingBudgetModels" | "escapeBuiltinToolNames" | "openaiChatEofTolerance" | "showThinkingSummary"
   | "googleMode" | "project" | "location" | "headers"
 >;
 
@@ -684,10 +688,9 @@ const DEEPSEEK_V4_LEGACY_MODELS = ["deepseek-v4-flash"];
 const DEEPSEEK_NATIVE_THINKING_MODELS = ["deepseek-flash", "deepseek-v4-flash"];
 const DEEPSEEK_GATEWAY_THINKING_MODELS = ["deepseek-v4.1-flash", "deepseek-v4-flash"];
 /*
- * DeepSeek's experimental vision preview (released 2026-08-21, api-docs.deepseek.com):
- * text+image input on the V4 Flash base. DeepSeek positions it as a preview id;
- * the expectation is that vision merges into `deepseek-v4-flash` proper later,
- * at which point this id retires the same way deepseek-chat/reasoner did.
+ * DeepSeek's legacy vision preview id (released 2026-08-21). First-party probes
+ * in #4436 resolve it to image-capable `deepseek-flash`; retain the existing
+ * declarations because gateway support is specific to each served identifier.
  */
 const DEEPSEEK_VISION_PREVIEW_MODEL = "deepseek-v4-flash-vision-exp";
 /**
@@ -1320,55 +1323,48 @@ export const PROVIDER_REGISTRY: readonly ProviderRegistryEntry[] = [
     noVisionModels: [...CURSOR_NO_VISION_MODELS],
   },
   {
-    // The signed-in Devin CLI as an account source.
-    //
-    // The CLI writes a `devin-session-token$<JWT>` to its own credentials.toml,
-    // which is the same credential RegisterUser hands `ocx login devin` and which
-    // the cloud-direct client already speaks. So this provider imports that token
-    // and streams over Connect-RPC like its browser-login sibling, rather than
-    // spawning `devin acp`.
+    // The canonical Cognition account provider, after absorbing `devin-cli`
+    // (devlog/_plan/260913_devin_provider_merge). The two ids were the same
+    // `devin` adapter, the same server.codeium.com api-server, and the same
+    // `devin-session-token$<JWT>` credential — only the account source
+    // differed: this entry did an Auth0 browser sign-in while `devin-cli`
+    // imported the token the installed CLI's own PKCE login had already
+    // written to credentials.toml. The merged login is import-first with a
+    // browser fallback: the CLI credential is taken when present (no browser
+    // opens), and the Auth0 flow remains because it is the only path for
+    // users without the CLI. `devin-cli` survives only as a deprecated
+    // alias; a startup migration rewrites saved provider rows, cross-config
+    // references, and auth.json slots to `devin`.
     //
     // `oauth` classifies the ACCOUNT, not the transport. This is not a local
-    // runtime: unlike Ollama or LM Studio it cannot answer at all until a vendor
-    // account is signed in, and `local` grouped it with things that have no
-    // account. It is also the only classification that reaches the dashboard
-    // Accounts tab, which is built from OAUTH_PROVIDERS.
-    //
-    // The ACP adapter stays registered and tested. It is no longer reachable
-    // under THIS id — `routedProviderConfig` pins the adapter from the registry
-    // for any row whose name is a registry id — but a custom-named row such as
-    // `{"devin-acp": {"adapter": "devin-cli", ...}}` is not pinned and still gets it.
-    id: "devin-cli",
-    label: "Devin CLI",
-    adapter: "devin",
-    baseUrl: "https://server.codeium.com",
-    authKind: "oauth",
-    featured: false,
-    // Off, like `devin`. `deriveProviderPresets` keys the preset catalog off this
-    // flag, so leaving it true would draw the row twice: an Accounts login row and
-    // a preset tile.
-    dashboardPreset: false,
-    note: "Imports the credential your installed Devin CLI already holds (`devin auth login`), then streams over Cognition's Connect-RPC api-server like the `devin` provider. No browser sign-in and no key to paste. For the CLI's own local agent loop over ACP stdio instead, configure a custom-named provider row with \"adapter\": \"devin-cli\".",
-    // Degraded-mode seed only; `liveModels` discovers the account's real roster,
-    // which is where `swe-2` and the rest of the current catalog come from.
-    models: ["swe-2", "swe-1-7", "gpt-5-6-sol", "gpt-6-astra", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5", "glm-5-3", "kimi-k3", "gemini-3-8-flash", "grok-4-6"],
-    liveModels: true,
-    defaultModel: "swe-2",
-    modelContextWindows: DEVIN_MODEL_CONTEXT_WINDOWS,
-  },
-  {
+    // runtime: unlike Ollama or LM Studio it cannot answer at all until a
+    // vendor account is signed in, and `local` grouped it with things that
+    // have no account. It is also the only classification that reaches the
+    // dashboard Accounts tab, which is built from OAUTH_PROVIDERS.
     id: "devin",
     label: "Cognition (Devin/Windsurf)",
     adapter: "devin",
     baseUrl: "https://server.codeium.com",
     authKind: "oauth",
     featured: false,
+    // Off: `deriveProviderPresets` keys the preset catalog off this flag, so a
+    // true row would draw the provider twice — an Accounts login row and a
+    // preset tile.
     dashboardPreset: false,
-    note: "Experimental unofficial Cognition/Devin bridge. ocx login devin opens Auth0 browser sign-in, then exchanges the token via Cognition's RegisterUser for a long-lived API key.",
-    models: ["swe-1-7", "swe-1-7-lightning", "gpt-5-6-sol", "gpt-5-6-luna", "gpt-5-6-terra", "claude-opus-4-8", "claude-fable-5-1", "claude-sonnet-5", "glm-5-2", "kimi-k2-7", "grok-4-5"],
+    note: "Experimental unofficial Cognition/Devin bridge. ocx login devin first imports the credential an installed Devin CLI already holds (no browser); without one it opens Auth0 browser sign-in and exchanges the token via Cognition's RegisterUser for a long-lived API key.",
+    // Union seed of the two merged rosters: the newer devin-cli lineup first
+    // (it is the current catalog, so its default ordering wins), then the ids
+    // only the old devin entry carried. Degraded-mode seed only either way —
+    // `liveModels` discovers the account's real roster.
+    models: ["swe-2", "swe-1-7", "gpt-5-6-sol", "gpt-6-astra", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5", "glm-5-3", "kimi-k3", "gemini-3-8-flash", "grok-4-6", "swe-1-7-lightning", "gpt-5-6-luna", "gpt-5-6-terra", "claude-opus-4-8", "glm-5-2", "kimi-k2-7", "grok-4-5"],
     liveModels: true,
-    defaultModel: "swe-1-7",
+    defaultModel: "swe-2",
     modelContextWindows: DEVIN_MODEL_CONTEXT_WINDOWS,
+    // Degraded-mode ladders only. Once a credential is present the account
+    // catalog supplies each base model its measured rungs; these two fields are
+    // what a signed-out picker and the Pi-shaped client exports fall back to.
+    modelReasoningEfforts: DEVIN_MODEL_EFFORTS,
+    reasoningEfforts: DEVIN_DEFAULT_EFFORTS,
   },
   {
     id: "xai",
@@ -1378,13 +1374,38 @@ export const PROVIDER_REGISTRY: readonly ProviderRegistryEntry[] = [
     authKind: "oauth",
     allowKeyAuthOverride: true,
     // Priority Processing is documented for xAI's public API-key Chat Completions and
-    // Responses endpoints. OAuth is a separate Grok CLI subscription gateway and remains
-    // unclassified; do not turn this into a provider-wide supportsServiceTier declaration.
+    // Responses endpoints. The OAuth lane is classified per-model below, not here:
+    // do not turn this into a provider-wide supportsServiceTier declaration.
     keyAuthServiceTier: {
       supportsServiceTier: true,
       chatServiceTier: true,
     },
-    fastTierDescription: "Priority processing, 2x token price",
+    // OAuth (Grok subscription gateway) service-tier capability, classified by live probe
+    // on 2026-09-13 (devlog/_fin/260913_xai_oauth_fast/020_probe-evidence.md): each listed
+    // model accepted service_tier "priority" over grok-oauth and echoed priority upstream.
+    // Key-auth already declares provider-wide support above, so this map only newly opens
+    // the OAuth lane. grok-4.20-multi-agent-0309 is deliberately absent: the gateway accepts
+    // the field but answers service_tier "default" — a live downgrade, not a fast tier.
+    // Unlisted and future-discovered ids stay unclassified.
+    modelSupportsServiceTier: {
+      "grok-4.6": true,
+      "grok-4.5": true,
+      "grok-4.3": true,
+      "grok-4.20-0309-reasoning": true,
+      "grok-4.20-0309-non-reasoning": true,
+      "grok-build-0.1": true,
+      "grok-composer-2.5-fast": true,
+    },
+    // Lets a caller-sent service_tier forward on the Chat wire (fastwire forwardCallerTier
+    // chain). Provider-wide by construction: unclassified chat-wire models then preserve a
+    // caller tier verbatim, the same contract other unclassified Responses routes already
+    // follow; --fast publication and proxy-owned fast injection stay capability-scoped by
+    // the map above. Key-auth declared the same value via keyAuthServiceTier, so the key
+    // lane is unchanged.
+    chatServiceTier: true,
+    // Shared across key and OAuth catalog rows. OAuth subscription has no
+    // per-token price, so the 2x claim is scoped to key auth.
+    fastTierDescription: "Priority processing; tier pricing applies on key auth only",
     featured: true,
     oauthId: "xai",
     jawcodeBundle: "xai",
@@ -1424,20 +1445,20 @@ export const PROVIDER_REGISTRY: readonly ProviderRegistryEntry[] = [
     // Grok 4.6/4.5 subscription Responses callers use the native wire with the existing
     // namespace/web-search/replay normalization. Chat remains an explicit modelAdapters
     // opt-in. Multi-agent has no Chat wire and uses Responses under both auth modes.
-    // Caller-owned service tiers stay off the unclassified OAuth subscription route; key-auth
-    // Fast remains proxy-owned and is still selected through keyAuthServiceTier above.
+    // grok-4.6/4.5 are classified OAuth fast-tier models (modelSupportsServiceTier above),
+    // so a caller-sent service_tier:"priority" forwards on this lane — the Codex fast-toggle
+    // path. Multi-agent keeps its pin: probed 2026-09-13, the gateway downgrades its tier to
+    // "default", so forwarding a caller tier would advertise a tier it does not get.
     modelWireDefaults: {
       "grok-4.6": {
         wire: "openai-responses",
         inbound: ["responses"],
         authModes: ["oauth"],
-        forwardCallerServiceTier: false,
       },
       "grok-4.5": {
         wire: "openai-responses",
         inbound: ["responses"],
         authModes: ["oauth"],
-        forwardCallerServiceTier: false,
       },
       "grok-4.20-multi-agent-0309": {
         // Even at high effort it emits no reasoning-summary deltas or encrypted replay
@@ -1753,6 +1774,12 @@ export const PROVIDER_REGISTRY: readonly ProviderRegistryEntry[] = [
     label: "Meta Muse Code (CLI credential)",
     adapter: "openai-responses",
     baseUrl: "https://api.meta.ai/v1",
+    // Meta own client sends this on every Muse Code call. We never have, so a future
+    // server-side requirement would break every Muse request with no local signal.
+    // Declared here rather than in a transport hook so it also covers model discovery
+    // (src/oauth/index.ts:1176) and still yields to a user-set header
+    // (mergeRegistryStaticHeaders, src/providers/registry.ts:3494).
+    staticHeaders: { "x-api-version": "1.0.0" },
     authKind: "oauth",
     oauthId: "meta-muse",
     dashboardUrl: "https://dev.meta.ai",
@@ -1765,7 +1792,7 @@ export const PROVIDER_REGISTRY: readonly ProviderRegistryEntry[] = [
     modelInputModalities: Object.fromEntries(META_MUSE_MODELS.map(id => [id, ["text", "image"] as ["text", "image"]])),
     modelReasoningEfforts: Object.fromEntries(META_MUSE_MODELS.map(id => [id, META_MUSE_REASONING_EFFORTS])),
     modelReasoningEffortMap: Object.fromEntries(META_MUSE_MODELS.map(id => [id, META_MUSE_REASONING_EFFORT_MAP])),
-    note: "Reuses the API key the Muse Code CLI stores after `muse login` (macOS only; requires the CLI installed and signed in). Meta ships no native Windows CLI and the Linux credential storage has not been measured, so on those platforms OpenCodex asks you to paste the Muse Code API key from https://dev.meta.ai instead of importing one; a pasted key faces the same format check and live validation as an imported one. Meta scopes that credential to the Muse Code CLI, so this is an UNSUPPORTED use: Meta does not authorize subscription coverage outside its own CLI, how these calls settle is not observable from the API, and you should treat every call as billable against your account. The key, imported or pasted, is copied into OpenCodex's auth store. OpenCodex reads Meta's subscription windows from streaming responses and shows the last observed value with its age; there is no endpoint to query them on demand, so refreshing one requires another streaming turn, and translated (non-passthrough) turns report none. Rate limits apply per team, not per key. For a supported path use the meta-model provider with your own key (export it as META_MODEL_API_KEY).",
+    note: "Signs in to Meta with a browser device code on any platform, then mints the Muse Code subscription key. That grant is reimplemented from the one the Muse Code CLI performs and has NOT been exercised against Meta from OpenCodex, so treat the first login as unverified. If the Muse Code CLI is already signed in on macOS, the existing key is imported instead of starting a new grant. A pasted key from https://dev.meta.ai still works as a fallback when a device login cannot complete, and faces the same format check and live validation. A device login authenticates as Meta own Muse Code client, which is a stronger claim than reusing a key the CLI already minted. Meta scopes that credential to the Muse Code CLI, so this is an UNSUPPORTED use: Meta does not authorize subscription coverage outside its own CLI, how these calls settle is not observable from the API, and you should treat every call as billable against your account. The key, imported or pasted, is copied into OpenCodex's auth store. For an account signed in with the device login, OpenCodex refreshes Meta's subscription windows on demand from the same key endpoint the login uses, at most once every five minutes. For an imported or pasted key there is no endpoint to query them on demand, so OpenCodex reads them from streaming responses and shows the last observed value with its age; refreshing one then requires another streaming turn, and translated (non-passthrough) turns report none. Rate limits apply per team, not per key. For a supported path use the meta-model provider with your own key (export it as META_MODEL_API_KEY).",
   },
   {
     id: "umans",
@@ -1819,6 +1846,9 @@ export const PROVIDER_REGISTRY: readonly ProviderRegistryEntry[] = [
     },
     modelContextWindows: {
       "kimi-k3": KIMI_K3_STANDARD_CONTEXT_WINDOW,
+      // Zen Go discovers only the gateway id, so carry DeepSeek's official 1M V4.1
+      // window here or Codex falls back to its conservative 128k routed-model default.
+      "deepseek-v4.1-flash": 1_048_576,
       // The DeepSeek vision preview id is metadata-only here: the Go roster is
       // discovered live, so it applies the moment the gateway serves the id.
       [DEEPSEEK_VISION_PREVIEW_MODEL]: 1_048_576,
@@ -2117,7 +2147,7 @@ export const PROVIDER_REGISTRY: readonly ProviderRegistryEntry[] = [
   // path must stay RELATIVE: this row sets `allowBaseUrlOverride`, and an absolute `url` would
   // retarget a user's custom base back to Google. A leading `./` is required because a bare
   // `v1internal:` reads as a URL scheme and `providerModelDiscoverySpecError` rejects it.
-  { id: "google-antigravity", alias: "agy", label: "Google Antigravity", adapter: "google", baseUrl: "https://daily-cloudcode-pa.googleapis.com", authKind: "oauth", allowBaseUrlOverride: true, dashboardUrl: "https://antigravity.google", models: ANTIGRAVITY_MODELS, liveModels: true, defaultModel: "gemini-3.8-flash", modelContextWindows: ANTIGRAVITY_MODEL_CONTEXT_WINDOWS, modelInputModalities: ANTIGRAVITY_MODEL_INPUT_MODALITIES, modelReasoningEfforts: ANTIGRAVITY_MODEL_EFFORTS, googleMode: "cloud-code-assist", jawcodeBundle: "google", extraMetadataAliases: ["antigravity", "gemini-antigravity"], modelDiscovery: { path: "./v1internal:fetchAvailableModels" } },
+  { id: "google-antigravity", alias: "agy", label: "Google Antigravity", adapter: "google", baseUrl: "https://daily-cloudcode-pa.googleapis.com", authKind: "oauth", allowBaseUrlOverride: true, dashboardUrl: "https://antigravity.google", models: ANTIGRAVITY_MODELS, liveModels: true, defaultModel: "gemini-3.8-flash", modelContextWindows: ANTIGRAVITY_MODEL_CONTEXT_WINDOWS, modelInputModalities: ANTIGRAVITY_MODEL_INPUT_MODALITIES, modelReasoningEfforts: ANTIGRAVITY_MODEL_EFFORTS, googleMode: "cloud-code-assist", showThinkingSummary: true, jawcodeBundle: "google", extraMetadataAliases: ["antigravity", "gemini-antigravity"], modelDiscovery: { path: "./v1internal:fetchAvailableModels" } },
   { id: "azure-openai", label: "Azure OpenAI", adapter: "azure-openai", baseUrl: "https://{resource}.openai.azure.com/openai", authKind: "key", featured: true, dashboardUrl: "https://portal.azure.com" },
   { id: "ollama", label: "Ollama (local)", adapter: "openai-chat", baseUrl: "http://localhost:11434/v1", authKind: "local", allowPrivateNetworkByDefault: true, allowBaseUrlOverride: true, featured: true, note: "Local — key usually blank" },
   { id: "vllm", label: "vLLM (local)", adapter: "openai-chat", baseUrl: "http://localhost:8000/v1", authKind: "local", allowPrivateNetworkByDefault: true, allowBaseUrlOverride: true, featured: true, note: "Local — key usually blank" },
@@ -2139,9 +2169,8 @@ export const PROVIDER_REGISTRY: readonly ProviderRegistryEntry[] = [
     // the list only as compatibility aliases so existing saved configs and requests
     // keep validating and routing (they previously mapped to v4-flash; devlog
     // _fin/260710_provider_hardening/002_research_cn.md). The current offerings are
-    // the V4 ids — defaultModel and the model-specific wiring above use them.
-    // deepseek-v4-flash-vision-exp: experimental vision preview (2026-08-21) —
-    // expected to merge into deepseek-v4-flash later; see DEEPSEEK_VISION_PREVIEW_MODEL.
+    // V4.1-Flash — defaultModel and the model-specific wiring below use its live id.
+    // Keep the legacy vision-preview alias; see DEEPSEEK_VISION_PREVIEW_MODEL.
     models: ["deepseek-chat", "deepseek-reasoner", ...DEEPSEEK_NATIVE_THINKING_MODELS, DEEPSEEK_VISION_PREVIEW_MODEL],
     // V4.1-Flash is the current first-party offering; `deepseek-v4-flash` now routes there
     // as a compatibility alias, so a new install should ask for the live id by name.
@@ -2149,7 +2178,10 @@ export const PROVIDER_REGISTRY: readonly ProviderRegistryEntry[] = [
     // Official DeepSeek Codex setup (codex-deepseek-setup.sh) advertises 1,048,576
     // for both V4 models; the older 1,000,000 figure was a rounded approximation.
     modelContextWindows: { "deepseek-flash": 1_048_576, "deepseek-v4-flash": 1_048_576, [DEEPSEEK_VISION_PREVIEW_MODEL]: 1_048_576 },
-    modelInputModalities: { [DEEPSEEK_VISION_PREVIEW_MODEL]: ["text", "image"] },
+    modelInputModalities: {
+      "deepseek-flash": ["text", "image"],
+      [DEEPSEEK_VISION_PREVIEW_MODEL]: ["text", "image"],
+    },
     // DeepSeek documents both V4 models as native Responses API models adapted for Codex
     // (model table marks Responses API ✓ for flash and pro; the /responses reference lists
     // both ids as accepted `model` values — verified 2026-08-13 with the V4 Pro GA,
@@ -2219,10 +2251,10 @@ export const PROVIDER_REGISTRY: readonly ProviderRegistryEntry[] = [
     modelReasoningEffortMap: Object.fromEntries(DEEPSEEK_NATIVE_THINKING_MODELS.map(id => [id, deepseekReasoningMapFor(id)])),
     modelSupportsReasoningSummaries: Object.fromEntries(DEEPSEEK_NATIVE_THINKING_MODELS.map(id => [id, true])),
     preserveReasoningContentModels: DEEPSEEK_NATIVE_THINKING_MODELS,
-    // Issue #88: every DeepSeek API model is text-only input (no image support upstream) — the
-    // vision sidecar describes attached images for them, and the catalog advertises image input
-    // on their behalf (same treatment as opencode-go's DeepSeek V4 entries above).
-    noVisionModels: ["deepseek-chat", "deepseek-reasoner", ...DEEPSEEK_NATIVE_THINKING_MODELS],
+    // #4436: first-party deepseek-flash accepts native images on Chat and Responses.
+    // Keep unprobed compatibility aliases on the #88 sidecar path. This must be fixed
+    // here: router enrichment unions this list with saved config, so config cannot remove it.
+    noVisionModels: ["deepseek-chat", "deepseek-reasoner", "deepseek-v4-flash"],
   },
   // llama-3.3-70b was deprecated by Cerebras on 2026-02-16. Evidence: devlog/_plan/260710_provider_hardening/003_research_aggregators.md.
   { id: "cerebras", label: "Cerebras", baseUrl: "https://api.cerebras.ai/v1", adapter: "openai-chat", authKind: "key", dashboardUrl: "https://cloud.cerebras.ai/platform/apikeys", defaultModel: "gpt-oss-120b" },

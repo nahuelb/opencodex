@@ -97,6 +97,41 @@ describe("bridge normalizes code-mode helper names against the declared catalog"
     expect(sse).toContain("image.png");
   });
 
+  test("view_image is compiled through code-mode exec and surfaces the image", async () => {
+    const sse = await drain(bridgeToResponsesSSE(
+      toolTurn("view_image", '{"file_path":"/tmp/image.png","detail":"high"}'),
+      "fixture-model",
+      undefined,
+      new Set(["exec"]),
+      undefined,
+      undefined,
+      50_000,
+      { declaredToolNames: new Set(["exec"]) },
+    ));
+    expect(sse).not.toContain("undeclared client tool");
+    expect(sse).toContain('"name":"exec"');
+    expect(sse).toContain('await tools.view_image({\\"detail\\":\\"high\\",\\"path\\":\\"/tmp/image.png\\"})');
+    expect(sse).toContain("image(result.image_url)");
+    expect(sse).not.toContain("tools.exec_command");
+  });
+
+  test("default.view_image is compiled through code-mode exec", async () => {
+    const sse = await drain(bridgeToResponsesSSE(
+      toolTurn("default.view_image", '{"path":"/tmp/image.png"}'),
+      "fixture-model",
+      undefined,
+      new Set(["exec"]),
+      undefined,
+      undefined,
+      50_000,
+      { declaredToolNames: new Set(["exec"]) },
+    ));
+    expect(sse).not.toContain("undeclared client tool");
+    expect(sse).toContain('"name":"exec"');
+    expect(sse).toContain("await tools.view_image");
+    expect(sse).not.toContain("tools.exec_command");
+  });
+
   test("a catalog that declares exec_command itself is never rewritten", async () => {
     const sse = await drain(bridgeToResponsesSSE(
       toolTurn("exec_command"), "deepseek-x", undefined, undefined, undefined, undefined, 50_000,
@@ -106,31 +141,23 @@ describe("bridge normalizes code-mode helper names against the declared catalog"
     expect(sse).toContain('"name":"exec_command"');
     expect(sse).toContain('"arguments":"{\\"cmd\\":\\"ls\\"}"');
   });
-});
 
-for (const name of ["view_image", "default.view_image"]) {
-  test(`${name} uses code-mode image output`, async () => {
+  // #4171 review: the flat-bridge shape declares `exec` next to a bare `exec_command`, where
+  // `exec` may be an ordinary caller tool and nested `tools.*` helpers are not what it runs.
+  // A `view_image` call there must not be compiled into code-mode JavaScript.
+  test("a flat-bridge catalog never compiles view_image into code-mode exec", async () => {
     const sse = await drain(bridgeToResponsesSSE(
-      toolTurn(name, JSON.stringify({ path: "/tmp/chart.png", detail: "original" })),
-      "fixture-model", undefined, new Set(["exec"]), undefined, undefined, 50_000,
-      { declaredToolNames: new Set(["exec"]) },
+      toolTurn("view_image", '{"path":"/tmp/image.png"}'),
+      "deepseek-x",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      50_000,
+      { declaredToolNames: new Set(["exec", "exec_command", "view_image"]) },
     ));
-    expect(sse).not.toContain("undeclared client tool");
-    expect(sse).toContain('"name":"exec"');
-    expect(sse).toContain("await tools.view_image(");
-    expect(sse).toContain("image(result.image_url, result.detail)");
-    expect(sse).not.toContain("await tools.exec_command(");
+    expect(sse).toContain('"name":"view_image"');
+    expect(sse).not.toContain("tools.view_image");
+    expect(sse).not.toContain('"name":"exec"');
   });
-}
-
-for (const declared of [["exec", "view_image"], ["exec", "default.view_image"], ["exec", "exec_command"]]) {
-  test(`image helper respects explicit catalog ${declared.join(",")}`, async () => {
-    const name = declared.includes("default.view_image") ? "default.view_image" : "view_image";
-    const sse = await drain(bridgeToResponsesSSE(toolTurn(name, '{"path":"/tmp/chart.png"}'),
-      "fixture-model", undefined, new Set(["exec"]), undefined, undefined, 50_000,
-      { declaredToolNames: new Set(declared) }));
-    if (declared.includes("exec_command")) expect(sse).toContain("undeclared client tool");
-    else expect(sse).toContain(JSON.stringify({ name }).slice(1, -1));
-    expect(sse).not.toContain("await tools.view_image(");
-  });
-}
+});

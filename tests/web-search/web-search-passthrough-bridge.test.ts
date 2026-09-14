@@ -14,6 +14,8 @@ import {
   createPassthroughWebSearchBridgeStream,
   planPassthroughWebSearchBridge,
   resolveOllamaWebSearchEndpoint,
+  resolvePassthroughWebSearchBridgeAuth,
+  shouldResolveOpenAiPassthroughWebSearchBridge,
   WEB_SEARCH_BRIDGE_ERROR_CODE,
   WEB_SEARCH_BRIDGE_MIXED_TOOLS_ERROR_CODE,
   type PassthroughWebSearchBridgePlan,
@@ -21,6 +23,11 @@ import {
 import { mapOllamaSearchResponse } from "../../src/web-search/ollama-executor";
 import { UNDECLARED_TOOL_CALL_ERROR_CODE } from "../../src/server/responses-undeclared-tool-guard";
 import { handleResponses } from "../../src/server/responses";
+import {
+  resetProviderRequestPacingForTest,
+  setProviderRequestPacingRuntimeForTest,
+  waitForProviderRequestSlot,
+} from "../../src/providers/request-pacing";
 import type { OcxConfig, OcxParsedRequest, OcxProviderConfig, ProviderWebSearchBridgeConfig } from "../../src/types";
 
 /** One SSE event block without its blank-line delimiter. */
@@ -141,7 +148,7 @@ describe("planPassthroughWebSearchBridge arming", () => {
     )).toBeUndefined();
   });
 
-  test("backends without a shipped executor stay inert rather than falling back", () => {
+  test("backends without resolved credentials stay inert rather than falling back", () => {
     for (const backend of ["openai", "anthropic", "xai", "gemini", "exa"] as const) {
       expect(planPassthroughWebSearchBridge(
         parsedFixture(),
@@ -176,6 +183,82 @@ describe("planPassthroughWebSearchBridge arming", () => {
     );
     expect(plan?.maxSearches).toBe(3);
     expect(plan?.timeoutMs).toBe(60_000);
+  });
+
+  test("an openai backend arms only when the ChatGPT sidecar is present", () => {
+    const provider = providerFixture({ enabled: true, backend: "openai" }, { baseUrl: "https://gateway.example/v1" });
+    expect(planPassthroughWebSearchBridge(parsedFixture(), provider, {
+      isPassthrough: true,
+      stream: true,
+    })).toBeUndefined();
+    const openAiSidecar = {
+      providerName: "openai" as const,
+      provider: { adapter: "openai-responses", baseUrl: "https://chatgpt.com/backend-api/codex", authMode: "forward" },
+      accountMode: "direct" as const,
+      authContext: { kind: "main" as const, accountId: null },
+      headers: new Headers({ authorization: "Bearer chatgpt" }),
+    };
+    const planned = planPassthroughWebSearchBridge(parsedFixture(), provider, {
+      isPassthrough: true,
+      stream: true,
+      auth: { openAiSidecar },
+    });
+    expect(planned).toEqual({ backend: "openai", maxSearches: 3, timeoutMs: 60_000 });
+    expect(shouldResolveOpenAiPassthroughWebSearchBridge(provider, parsedFixture(), true)).toBe(true);
+    expect(shouldResolveOpenAiPassthroughWebSearchBridge(providerFixture(armed), parsedFixture(), true)).toBe(false);
+  });
+
+  test("sidecar backends arm only with their own credential handle", () => {
+    const gateway = { baseUrl: "https://gateway.example/v1" };
+    const anthropic = { providerName: "claude", provider: { adapter: "anthropic", baseUrl: "https://api.anthropic.com", authMode: "oauth" } };
+    const xai = { providerName: "xai", provider: { adapter: "openai-responses", baseUrl: "https://api.x.ai/v1", authMode: "oauth" } };
+    const gemini = { providerName: "google-antigravity", provider: { adapter: "google-antigravity", baseUrl: "https://cloudcode-pa.googleapis.com", authMode: "oauth" } };
+    expect(planPassthroughWebSearchBridge(
+      parsedFixture(),
+      providerFixture({ enabled: true, backend: "anthropic" }, gateway),
+      { isPassthrough: true, stream: true, auth: { anthropic } },
+    )?.backend).toBe("anthropic");
+    expect(planPassthroughWebSearchBridge(
+      parsedFixture(),
+      providerFixture({ enabled: true, backend: "xai" }, gateway),
+      { isPassthrough: true, stream: true, auth: { xai } },
+    )?.backend).toBe("xai");
+    expect(planPassthroughWebSearchBridge(
+      parsedFixture(),
+      providerFixture({ enabled: true, backend: "gemini" }, gateway),
+      { isPassthrough: true, stream: true, auth: { gemini } },
+    )?.backend).toBe("gemini");
+    expect(planPassthroughWebSearchBridge(
+      parsedFixture(),
+      providerFixture({ enabled: true, backend: "exa" }, gateway),
+      { isPassthrough: true, stream: true, auth: { exaApiKey: "exa-canary" } },
+    )?.backend).toBe("exa");
+    // A named backend does not borrow a different credential.
+    expect(planPassthroughWebSearchBridge(
+      parsedFixture(),
+      providerFixture({ enabled: true, backend: "exa" }, gateway),
+      { isPassthrough: true, stream: true, auth: { anthropic, xai, gemini } },
+    )).toBeUndefined();
+    expect(planPassthroughWebSearchBridge(
+      parsedFixture(),
+      providerFixture({ enabled: true, backend: "openai" }, gateway),
+      { isPassthrough: true, stream: true, auth: { exaApiKey: "exa-canary" } },
+    )).toBeUndefined();
+  });
+
+  test("resolvePassthroughWebSearchBridgeAuth inspects only the named backend", () => {
+    const cfg = {
+      port: 0,
+      defaultProvider: "fixture",
+      providers: {},
+      webSearchSidecar: { exaApiKey: "exa-canary" },
+    } as unknown as OcxConfig;
+    expect(resolvePassthroughWebSearchBridgeAuth("exa", cfg)).toEqual({ exaApiKey: "exa-canary" });
+    expect(resolvePassthroughWebSearchBridgeAuth("openai", cfg)).toEqual({});
+    expect(resolvePassthroughWebSearchBridgeAuth("anthropic", cfg)).toEqual({});
+    expect(resolvePassthroughWebSearchBridgeAuth("xai", cfg)).toEqual({});
+    expect(resolvePassthroughWebSearchBridgeAuth("gemini", cfg)).toEqual({});
+    expect(resolvePassthroughWebSearchBridgeAuth("ollama", cfg)).toEqual({});
   });
 });
 
@@ -385,6 +468,137 @@ describe("the bridged client stream", () => {
     expect((cell!.item as Record<string, unknown>).status).toBe("failed");
   });
 
+  test("already-hosted web_search_call items pass through without a proxy search", async () => {
+    let sends = 0;
+    let executes = 0;
+    const hosted = {
+      type: "web_search_call",
+      id: "ws_hosted",
+      status: "completed",
+      action: { type: "search", query: "latest status" },
+    };
+    const hostedLeg = sseBody(
+      frame("response.output_item.added", { output_index: 0, item: { ...hosted, status: "in_progress" } }),
+      frame("response.output_item.done", { output_index: 0, item: hosted }),
+      frame("response.output_item.added", { output_index: 1, item: { ...answer, content: [] } }),
+      frame("response.output_item.done", { output_index: 1, item: answer }),
+      frame("response.completed", {
+        response: { id: "resp_1", status: "completed", output: [hosted, answer] },
+      }),
+    );
+    const stream = createPassthroughWebSearchBridgeStream({
+      plan,
+      firstLeg: streamFromText(hostedLeg),
+      requestBody: initialBody,
+      send: async () => {
+        sends += 1;
+        return new Response(null, { status: 500 });
+      },
+      execute: async () => {
+        executes += 1;
+        return { text: "unused", sources: [] };
+      },
+    });
+    const body = await new Response(stream).text();
+    expect(sends).toBe(0);
+    expect(executes).toBe(0);
+    expect(body).toContain("\"type\":\"web_search_call\"");
+    expect(body).toContain("The current release is 2.50.0.");
+    expect(body).not.toContain("response.failed");
+  });
+
+  test("probe B mixed hosted cells plus exec plus web_search still fail closed", async () => {
+    let sends = 0;
+    let executes = 0;
+    const hosted = {
+      type: "web_search_call",
+      id: "ws_hosted",
+      status: "completed",
+      action: { type: "search", query: "already searched" },
+    };
+    const execCall = {
+      type: "function_call",
+      id: "fc_exec",
+      call_id: "call_exec",
+      name: "exec",
+      arguments: "{\"cmd\":\"python fetch.py\"}",
+    };
+    const probeB = sseBody(
+      frame("response.output_item.added", { output_index: 0, item: { ...hosted, status: "in_progress" } }),
+      frame("response.output_item.done", { output_index: 0, item: hosted }),
+      frame("response.output_item.added", { output_index: 1, item: { ...execCall, arguments: "" } }),
+      frame("response.output_item.done", { output_index: 1, item: execCall }),
+      frame("response.output_item.added", { output_index: 2, item: { ...searchCall, arguments: "" } }),
+      frame("response.output_item.done", { output_index: 2, item: searchCall }),
+      frame("response.completed", {
+        response: { id: "resp_1", status: "completed", output: [hosted, execCall, searchCall] },
+      }),
+    );
+    const stream = createPassthroughWebSearchBridgeStream({
+      plan,
+      firstLeg: streamFromText(probeB),
+      requestBody: initialBody,
+      send: async () => {
+        sends += 1;
+        return new Response(null, { status: 500 });
+      },
+      execute: async () => {
+        executes += 1;
+        return { text: "unused", sources: [] };
+      },
+    });
+    const body = await new Response(stream).text();
+    expect(sends).toBe(0);
+    expect(executes).toBe(0);
+    expect(body).not.toContain("\"name\":\"exec\"");
+    const failed = clientEvents(body).find(event => event.type === "response.failed");
+    expect((failed!.response as { error: Record<string, unknown> }).error.code)
+      .toBe(WEB_SEARCH_BRIDGE_MIXED_TOOLS_ERROR_CODE);
+  });
+
+  test("DeepSeek-style XML assistant text is not dispatched as a search", async () => {
+    let sends = 0;
+    let executes = 0;
+    const xmlAnswer = {
+      type: "message",
+      id: "msg_xml",
+      role: "assistant",
+      content: [{
+        type: "output_text",
+        text: "I'll search for that information now.\n\n<web_search>\n<query>DeepSeek V4.1-Flash API price</query>\n</web_search>\n\nI don't have a web_search tool available.",
+      }],
+    };
+    const xmlLeg = sseBody(
+      frame("response.output_item.added", { output_index: 0, item: { ...xmlAnswer, content: [] } }),
+      frame("response.output_item.done", { output_index: 0, item: xmlAnswer }),
+      frame("response.completed", {
+        response: { id: "resp_1", status: "completed", output: [xmlAnswer] },
+      }),
+    );
+    const stream = createPassthroughWebSearchBridgeStream({
+      plan,
+      firstLeg: streamFromText(xmlLeg),
+      requestBody: initialBody,
+      send: async () => {
+        sends += 1;
+        return new Response(null, { status: 500 });
+      },
+      execute: async () => {
+        executes += 1;
+        return { text: "unused", sources: [] };
+      },
+    });
+    const body = await new Response(stream).text();
+    expect(sends).toBe(0);
+    expect(executes).toBe(0);
+    expect(body).toContain("<web_search>");
+    expect(body).toContain("DeepSeek V4.1-Flash API price");
+    expect(body).not.toContain("response.failed");
+    expect(clientEvents(body).some(event =>
+      event.type === "response.output_item.added"
+      && (event.item as Record<string, unknown>).type === "web_search_call")).toBe(false);
+  });
+
   test("a search that is not the last item keeps its streamed position", async () => {
     // The model searches first and keeps talking; the hosted cell must open where the call stood.
     const leg = sseBody(
@@ -572,33 +786,59 @@ describe("the reported turn, end to end through handleResponses", () => {
   async function post(
     ocxConfig: OcxConfig,
     legs: string[],
-  ): Promise<{ body: string; outbound: string[]; searches: number }> {
+    hooks: { onSearch?: () => void; onProviderResponse?: (leg: number) => void } = {},
+  ): Promise<{
+    body: string;
+    outbound: string[];
+    destinations: Array<{ url: string; authorization: string | null }>;
+    searches: number;
+    searchUrls: string[];
+    searchHeaders: Array<{ url: string; authorization: string | null; xApiKey: string | null }>;
+  }> {
     const savedFetch = globalThis.fetch;
     const outbound: string[] = [];
+    const destinations: Array<{ url: string; authorization: string | null }> = [];
+    const searchUrls: string[] = [];
+    const searchHeaders: Array<{ url: string; authorization: string | null; xApiKey: string | null }> = [];
     let searches = 0;
     let leg = 0;
     globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
       const url = typeof input === "string"
         ? input
         : input instanceof URL ? input.href : (input as Request).url;
-      if (url.includes("/api/web_search")) {
+      if (url.includes("/api/web_search") || url.includes("api.exa.ai/search")) {
         searches += 1;
+        searchUrls.push(url);
+        const headers = new Headers(init?.headers);
+        searchHeaders.push({
+          url,
+          authorization: headers.get("authorization"),
+          xApiKey: headers.get("x-api-key"),
+        });
+        hooks.onSearch?.();
         return new Response(JSON.stringify({
-          results: [{ title: "Releases", url: "https://example.test/rel", content: "opencodex 2.50.0" }],
+          results: [{
+            title: "Releases",
+            url: "https://example.test/rel",
+            content: "opencodex 2.50.0",
+            text: "opencodex 2.50.0",
+          }],
         }), { headers: { "content-type": "application/json" } });
       }
       outbound.push(String(init?.body ?? ""));
+      destinations.push({ url, authorization: new Headers(init?.headers).get("authorization") });
       const text = legs[Math.min(leg, legs.length - 1)]!;
       leg += 1;
+      hooks.onProviderResponse?.(leg);
       return new Response(text, { headers: { "content-type": "text/event-stream" } });
     }) as unknown as typeof fetch;
     try {
       const response = await handleResponses(new Request("http://localhost/v1/responses", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", authorization: "Bearer caller-inbound" },
         body: clientRequest,
       }), ocxConfig, { model: "", provider: "" });
-      return { body: await response.text(), outbound, searches };
+      return { body: await response.text(), outbound, destinations, searches, searchUrls, searchHeaders };
     } finally {
       globalThis.fetch = savedFetch;
     }
@@ -624,12 +864,159 @@ describe("the reported turn, end to end through handleResponses", () => {
 
     // The search result reached the SECOND upstream body as a native tool result.
     expect(result.outbound).toHaveLength(2);
+    expect(result.destinations).toEqual([
+      { url: "https://ollama.com/v1/responses", authorization: "Bearer fixture-key" },
+      { url: "https://ollama.com/v1/responses", authorization: "Bearer fixture-key" },
+    ]);
     const continuation = JSON.parse(result.outbound[1]!) as { input: Record<string, unknown>[] };
     const output = continuation.input.find(item => item.type === "function_call_output");
     expect(output).toBeDefined();
     expect(String(output!.output)).toContain("opencodex 2.50.0");
     expect(continuation.input.some(item =>
       item.type === "function_call" && item.name === "web_search")).toBe(true);
+  });
+
+  const selectionChanges: Array<[string, (ocxConfig: OcxConfig) => void]> = [
+    ["selection revision with an unchanged key", cfg => {
+      cfg.providers.fixture!.apiKeySelectionRevision = "selection-after";
+    }],
+    ["key reference with the same resolved value", cfg => {
+      cfg.providers.fixture!.apiKey = "${OCX_BRIDGE_BINDING_ALTERNATE}";
+      cfg.providers.fixture!.apiKeyPool![0]!.key = "${OCX_BRIDGE_BINDING_ALTERNATE}";
+    }],
+    ["selected entry id", cfg => {
+      cfg.providers.fixture!.apiKeyPool![0]!.id = "entry-after";
+    }],
+    ["resolved key behind an unchanged reference", () => {
+      process.env.OCX_BRIDGE_BINDING_KEY = "fixture-key-after";
+    }],
+    ["authentication mode", cfg => { cfg.providers.fixture!.authMode = "forward"; }],
+    ["base URL", cfg => { cfg.providers.fixture!.baseUrl = "https://gateway.example/v1"; }],
+    ["provider disabled", cfg => { cfg.providers.fixture!.disabled = true; }],
+    ["provider removed", cfg => { delete cfg.providers.fixture; }],
+  ];
+
+  test.each(selectionChanges)("refuses the continuation when search changes the %s", async (_name, change) => {
+    const savedKey = process.env.OCX_BRIDGE_BINDING_KEY;
+    const savedAlternate = process.env.OCX_BRIDGE_BINDING_ALTERNATE;
+    process.env.OCX_BRIDGE_BINDING_KEY = "fixture-key";
+    process.env.OCX_BRIDGE_BINDING_ALTERNATE = "fixture-key";
+    const cfg = config(armed);
+    Object.assign(cfg.providers.fixture!, {
+      apiKey: "${OCX_BRIDGE_BINDING_KEY}",
+      apiKeySelectionRevision: "selection-before",
+      apiKeyPool: [{ id: "entry-before", key: "${OCX_BRIDGE_BINDING_KEY}" }],
+    });
+    try {
+      const result = await post(cfg, [searchLeg(), answerLeg()], { onSearch: () => change(cfg) });
+      expect(result.searches).toBe(1);
+      expect(result.outbound).toHaveLength(1);
+      expect(result.destinations).toEqual([
+        { url: "https://ollama.com/v1/responses", authorization: "Bearer fixture-key" },
+      ]);
+      const events = clientEvents(result.body);
+      expect(events.filter(event => event.type === "response.failed")).toHaveLength(1);
+      expect(events.filter(event => event.type === "response.completed")).toHaveLength(0);
+      expect(result.body).toContain(WEB_SEARCH_BRIDGE_ERROR_CODE);
+      expect(result.body).not.toContain("The current release is 2.50.0.");
+    } finally {
+      if (savedKey === undefined) delete process.env.OCX_BRIDGE_BINDING_KEY;
+      else process.env.OCX_BRIDGE_BINDING_KEY = savedKey;
+      if (savedAlternate === undefined) delete process.env.OCX_BRIDGE_BINDING_ALTERNATE;
+      else process.env.OCX_BRIDGE_BINDING_ALTERNATE = savedAlternate;
+    }
+  });
+
+  test("rechecks the continuation binding after its pacing wait", async () => {
+    const cfg = config(armed);
+    cfg.providers.fixture!.requestPacing = { enabled: true, minIntervalMs: 100 };
+    let now = 0;
+    let searches = 0;
+    let waitsAfterSearch = 0;
+    resetProviderRequestPacingForTest();
+    setProviderRequestPacingRuntimeForTest({
+      now: () => now,
+      setTimer: (callback, delayMs) => {
+        queueMicrotask(() => {
+          if (searches > 0) {
+            waitsAfterSearch += 1;
+            cfg.providers.fixture!.apiKeySelectionRevision = "selection-during-pacing";
+          }
+          now += delayMs;
+          callback();
+        });
+        return 1;
+      },
+      clearTimer: () => {},
+      enqueueMicrotask: queueMicrotask,
+    });
+    try {
+      const result = await post(cfg, [searchLeg(), answerLeg()], { onSearch: () => { searches += 1; } });
+      expect(result.searches).toBe(1);
+      expect(waitsAfterSearch).toBe(1);
+      expect(result.outbound).toHaveLength(1);
+      expect(result.body).toContain(WEB_SEARCH_BRIDGE_ERROR_CODE);
+      expect(clientEvents(result.body).filter(event => event.type === "response.completed")).toHaveLength(0);
+    } finally {
+      resetProviderRequestPacingForTest();
+    }
+  });
+
+  test("keeps the dispatched binding if selection changes before first-leg headers return", async () => {
+    const cfg = config(armed);
+    const result = await post(cfg, [searchLeg(), answerLeg()], {
+      onProviderResponse: leg => {
+        if (leg === 1) cfg.providers.fixture!.apiKey = "fixture-key-after";
+      },
+    });
+    expect(result.searches).toBe(1);
+    expect(result.outbound).toHaveLength(1);
+    expect(result.destinations[0]!.authorization).toBe("Bearer fixture-key");
+    expect(result.body).toContain(WEB_SEARCH_BRIDGE_ERROR_CODE);
+    expect(clientEvents(result.body).filter(event => event.type === "response.completed")).toHaveLength(0);
+  });
+
+  test("allows initial dispatch reselection and binds search to the key that served it", async () => {
+    const cfg = config(armed);
+    cfg.providers.fixture!.requestPacing = { enabled: true, minIntervalMs: 100 };
+    let now = 0;
+    let waits = 0;
+    resetProviderRequestPacingForTest();
+    setProviderRequestPacingRuntimeForTest({
+      now: () => now,
+      setTimer: (callback, delayMs) => {
+        queueMicrotask(() => {
+          waits += 1;
+          if (waits === 1) {
+            cfg.providers.fixture!.apiKey = "fixture-key-after";
+            cfg.providers.fixture!.apiKeySelectionRevision = "selection-before-first-send";
+          }
+          now += delayMs;
+          callback();
+        });
+        return 1;
+      },
+      clearTimer: () => {},
+      enqueueMicrotask: queueMicrotask,
+    });
+    try {
+      // Occupy the first slot so the already-built request must wait before credential dispatch.
+      await waitForProviderRequestSlot("fixture", cfg.providers.fixture!, "glm-4.7");
+      const result = await post(cfg, [searchLeg(), answerLeg()]);
+      expect(waits).toBe(2);
+      expect(result.searches).toBe(1);
+      expect(result.destinations).toEqual([
+        { url: "https://ollama.com/v1/responses", authorization: "Bearer fixture-key-after" },
+        { url: "https://ollama.com/v1/responses", authorization: "Bearer fixture-key-after" },
+      ]);
+      const continuation = JSON.parse(result.outbound[1]!) as { input: Record<string, unknown>[] };
+      const output = continuation.input.find(item => item.type === "function_call_output");
+      expect(String(output?.output)).toContain("opencodex 2.50.0");
+      expect(result.body).toContain("The current release is 2.50.0.");
+      expect(result.body).not.toContain("response.failed");
+    } finally {
+      resetProviderRequestPacingForTest();
+    }
   });
 
   test("an unrelated undeclared tool still fails closed through the bridged stream", async () => {
@@ -653,5 +1040,92 @@ describe("the reported turn, end to end through handleResponses", () => {
     expect(result.body).toContain("response.failed");
     expect(result.body).toContain(UNDECLARED_TOOL_CALL_ERROR_CODE);
     expect(result.body).toContain("frobnicate");
+  });
+
+  test("an exa-backed gateway executes hosted-only search without the ollama origin", async () => {
+    const cfg = {
+      port: 0,
+      defaultProvider: "fixture",
+      providers: {
+        fixture: {
+          adapter: "openai-responses",
+          baseUrl: "https://gateway.example/v1",
+          authMode: "key",
+          apiKey: "fixture-key",
+          webSearchBridge: { enabled: true, backend: "exa" },
+        },
+      },
+      webSearchSidecar: { exaApiKey: "exa-canary" },
+    } as unknown as OcxConfig;
+    const result = await post(cfg, [searchLeg(), answerLeg()]);
+    expect(result.searchUrls).toEqual(["https://api.exa.ai/search"]);
+    expect(result.searchHeaders).toEqual([
+      { url: "https://api.exa.ai/search", authorization: null, xApiKey: "exa-canary" },
+    ]);
+    expect(result.body).not.toContain(UNDECLARED_TOOL_CALL_ERROR_CODE);
+    expect(result.body).toContain("\"type\":\"web_search_call\"");
+    expect(result.body).not.toContain("\"name\":\"web_search\"");
+    expect(result.body).toContain("The current release is 2.50.0.");
+    expect(result.destinations.map(destination => destination.url)).toEqual([
+      "https://gateway.example/v1/responses",
+      "https://gateway.example/v1/responses",
+    ]);
+    expect(result.destinations.every(destination => destination.authorization === "Bearer fixture-key")).toBe(true);
+  });
+
+  test("an exa-backed mixed exec/search turn still fails closed", async () => {
+    const cfg = {
+      port: 0,
+      defaultProvider: "fixture",
+      providers: {
+        fixture: {
+          adapter: "openai-responses",
+          baseUrl: "https://gateway.example/v1",
+          authMode: "key",
+          apiKey: "fixture-key",
+          webSearchBridge: { enabled: true, backend: "exa" },
+        },
+      },
+      webSearchSidecar: { exaApiKey: "exa-canary" },
+    } as unknown as OcxConfig;
+    const execCall = {
+      type: "function_call",
+      id: "fc_exec",
+      call_id: "call_exec",
+      name: "exec",
+      arguments: "{}",
+    };
+    const mixedLeg = sseBody(
+      frame("response.output_item.added", { output_index: 0, item: { ...searchCall, arguments: "" } }),
+      frame("response.output_item.done", { output_index: 0, item: searchCall }),
+      frame("response.output_item.added", { output_index: 1, item: { ...execCall, arguments: "" } }),
+      frame("response.output_item.done", { output_index: 1, item: execCall }),
+      frame("response.completed", {
+        response: { id: "resp_1", status: "completed", output: [searchCall, execCall] },
+      }),
+    );
+    const result = await post(cfg, [mixedLeg]);
+    expect(result.searches).toBe(0);
+    expect(result.body).toContain(WEB_SEARCH_BRIDGE_MIXED_TOOLS_ERROR_CODE);
+    expect(result.body).not.toContain("\"name\":\"exec\"");
+  });
+
+  test("exa without a key stays disarmed on a non-ollama gateway", async () => {
+    const cfg = {
+      port: 0,
+      defaultProvider: "fixture",
+      providers: {
+        fixture: {
+          adapter: "openai-responses",
+          baseUrl: "https://gateway.example/v1",
+          authMode: "key",
+          apiKey: "fixture-key",
+          webSearchBridge: { enabled: true, backend: "exa" },
+        },
+      },
+    } as unknown as OcxConfig;
+    const result = await post(cfg, [searchLeg()]);
+    expect(result.searches).toBe(0);
+    expect(result.body).toContain(UNDECLARED_TOOL_CALL_ERROR_CODE);
   });
 });
