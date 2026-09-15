@@ -1,5 +1,8 @@
 # Claude Desktop Integration
 
+Desktop callers retain their existing ingress through the Responses
+[core module ownership](../transports/responses.md#core-module-ownership). This surface retains its existing behavior.
+
 The configuration-only [plaintext V2 contract](../subagents.md#plaintext-v2-agent-messages)
 is scoped to canonical ChatGPT Responses forwarding; other source-area behavior described here is unchanged.
 
@@ -8,7 +11,14 @@ That projection does not migrate existing user-selected Desktop configuration or
 
 Shared parsing and streaming follow the [request-copy](../transports/byte-accounting.md#request-copy-accounting) and [stream-buffer accounting](../transports/byte-accounting.md#stream-buffer-accounting) contracts.
 
+Claude-only connections keep their existing non-failing readiness policy; displayed catalog reasons follow the [terminal rendering contract](../runtime.md#cli-readiness-diagnostics) whether they surface at connect time or on a later refresh.
+
+The hub-side CLI dashboard uses the [management ingress address](../runtime.md#hub-management-dashboard-address); this does not change connected Desktop profile endpoints.
+
 ## Connected Claude Desktop profiles
+
+The connection's local Codex readiness check follows the [selected-runtime probe contract](../runtime.md#remote-hub-hardening-ownership); general status hands its resolved command to this check instead of probing the version twice.
+It does not discover lower-priority alternatives after a valid selection or alter Desktop ownership.
 
 Connected `ocx claude desktop apply` reads the hub's Desktop snapshot and writes the hub origin
 and exact hub-issued IDs to the local Desktop configuration. Static/hybrid embed the entries;
