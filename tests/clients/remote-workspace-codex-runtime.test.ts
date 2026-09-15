@@ -20,6 +20,7 @@ test("Codex Remote Workspace runtime owns the model process on the Hub", async (
     version: "0.146.0-test",
     env: {
       FAKE_CODEX_SCRIPT: JSON.stringify({
+        config: { hooks: { state: { "local-hook": { enabled: true } }, stop: [] } },
         turns: [{
           notifications: [{
             method: "item/completed",

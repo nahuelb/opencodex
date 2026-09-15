@@ -48,6 +48,7 @@ Codex Remote Workspace uses current App Server permission profiles. If the Hub's
 configuration still sets legacy `sandbox_mode` or `sandbox_workspace_write`, the dashboard reports
 Codex as unavailable instead of starting with a weaker boundary. Migrate that Codex profile before
 using the feature; do not configure both the legacy sandbox and a permission profile.
+Existing Codex hook-state metadata remains valid when Remote Workspace disables inherited hook event lists.
 
 ## Pair an Executor
 

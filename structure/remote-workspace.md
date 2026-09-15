@@ -10,7 +10,7 @@
 
 `src/remote-control/workspace-hub.ts`, `src/remote-control/workspace-device.ts` and `src/remote-control/workspace-sessions.ts` own separate persisted state. `src/remote-control/workspace-secret-store.ts` requires private permissions and rejects access failures rather than treating them as first-run absence. Publication reuses `src/config/atomic-write.ts`; workspace file publication uses the remote-workspace publisher in `src/lib/windows-atomic-replace.ts`.
 
-`src/remote-control/workspace-runtime.ts` is the lazy composition owner for Hub services. Codex, Claude and Pi adapters keep model processes on the Hub and expose selected remote tools. Their source configuration is not evidence of live CLI confinement. `src/cli/remote-workspace.ts` contains registered executor pair/agent/status handling; the machine-readable entries live in `src/cli/capabilities.ts`.
+`src/remote-control/workspace-runtime.ts` is the lazy composition owner for Hub services. Codex, Claude and Pi adapters keep model processes on the Hub and expose selected remote tools. The Codex adapter clears array-valued hook event lists while preserving map-valued hook state metadata. Their source configuration is not evidence of live CLI confinement. `src/cli/remote-workspace.ts` contains registered executor pair/agent/status handling; the machine-readable entries live in `src/cli/capabilities.ts`.
 
 The optional terminal prototype in `src/remote-control/host.ts` invokes only a caller-supplied factory after authenticated traffic. `src/remote-control/relay.ts` routes opaque prototype envelopes after caller authorization. Neither is a production terminal service.
 

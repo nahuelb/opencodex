@@ -19,6 +19,7 @@ type ScriptTurn = {
 };
 
 type Script = {
+  config?: Record<string, unknown>;
   startupDelayMs?: number;
   neverRespondToInit?: boolean;
   exitAtStartup?: boolean;
@@ -178,10 +179,15 @@ async function handleMessage(msg: Record<string, unknown>): Promise<void> {
   }
   switch (method) {
     case "config/read": {
-      respond(id, { config: {}, origins: {}, layers: null });
+      respond(id, { config: script.config ?? {}, origins: {}, layers: null });
       return;
     }
     case "thread/start": {
+      const hooks = (params.config as { hooks?: { state?: unknown } } | undefined)?.hooks;
+      if (Array.isArray(hooks?.state)) {
+        respondError(id, "invalid type: sequence, expected a map in hooks.state");
+        return;
+      }
       if (script.rejectThreadStart) {
         respondError(id, script.rejectThreadStart);
         return;

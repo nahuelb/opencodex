@@ -462,7 +462,9 @@ export class CodexRemoteWorkspaceRuntimeFactory implements RemoteWorkspaceRuntim
         throw new Error("Codex Remote Workspace requires permission profiles; remove legacy sandbox_mode settings from the selected Codex profile first");
       }
       const disabledServerNames = Object.keys(object(effectiveConfig.mcp_servers) ?? {});
-      const disabledHookNames = Object.keys(object(effectiveConfig.hooks) ?? {});
+      const disabledHookNames = Object.entries(object(effectiveConfig.hooks) ?? {})
+        .filter(([, value]) => Array.isArray(value))
+        .map(([name]) => name);
       const threadParams = remoteWorkspaceThreadStartParams({
         executorName: options.deviceName,
         coordinatorIsolationPath: isolation,
