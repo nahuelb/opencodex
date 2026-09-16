@@ -152,3 +152,12 @@ Canonical Responses identity sanitation and narrowly scoped pre-output combo rec
 Cursor's Muse Spark 1.3 catalog, wire efforts, native image input, and price source follow the [Cursor catalog contract](../providers/cursor.md#muse-spark-catalog).
 
 OpenCode Muse Responses routes use the [exact effort ladder](../catalog.md#opencode-muse-effort-ladders) and [per-attempt wire metadata](responses.md#passthrough-effort-logging); transport selection is unchanged.
+
+## OpenCode Zen Anthropic affinity
+
+The Zen registry recognizes `https://opencode.ai/zen/v1` with the `anthropic` adapter as an
+alternate destination. `src/providers/opencode-go-transport.ts` therefore derives the same
+conversation-scoped `x-opencode-session` header for a custom Anthropic Zen provider as for the
+Chat preset. Explicit operator headers win; absent conversation identity stays absent.
+Other destinations and OAuth/forward authentication do not gain Zen affinity.
+`tests/providers/opencode-go-session-header.test.ts` covers the translated Responses dispatch.

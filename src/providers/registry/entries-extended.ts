@@ -902,6 +902,7 @@ export const PROVIDER_REGISTRY_EXTENDED: readonly ProviderRegistryEntry[] = [
   },
   {
     id: "opencode-zen", label: "opencode zen", baseUrl: "https://opencode.ai/zen/v1", adapter: "openai-chat", authKind: "key", dashboardUrl: "https://opencode.ai/auth",
+    destinationAliases: [{ baseUrl: "https://opencode.ai/zen/v1", adapter: "anthropic" }],
     // Same opencode.ai/zen/v1 gateway as `opencode-free` (keyed tier): DeepSeek thinking mode
     // requires the assistant's original reasoning_content to be replayed on tool-call
     // continuations, or the gateway answers HTTP 400 (issues #950/#994). Mirror the DeepSeek

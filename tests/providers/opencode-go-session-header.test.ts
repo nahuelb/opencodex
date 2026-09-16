@@ -31,6 +31,17 @@ function codexHeaders(child = "child-thread-a"): Record<string, string> {
 }
 
 function upstreamResponse(url: string, stream = false): Response {
+  if (url.endsWith("/messages")) {
+    return Response.json({
+      id: "msg_union_alpha",
+      type: "message",
+      role: "assistant",
+      model: "union-alpha",
+      content: [{ type: "text", text: "ok" }],
+      stop_reason: "end_turn",
+      usage: { input_tokens: 1, output_tokens: 1 },
+    });
+  }
   if (stream && url.endsWith("/chat/completions")) {
     return new Response([
       `data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: "assistant", content: "ok" } }] })}\n\n`,
@@ -511,6 +522,28 @@ describe("OpenCode Zen Muse routing", () => {
   function zen(name = "opencode-zen", overrides: Partial<OcxProviderConfig> = {}): OcxProviderConfig {
     return { ...providerConfigSeed(getProviderRegistryEntry(name)!), apiKey: "test-key", ...overrides };
   }
+
+  test("Zen Anthropic routes preserve per-conversation affinity on Responses ingress", async () => {
+    const provider = zen("opencode-zen", { adapter: "anthropic", modelReasoningEfforts: { "union-alpha": [] } });
+    const input = { providerName: "zen-union", model: "union-alpha", provider };
+    const first = await captureRequest(input);
+    const continued = await captureRequest(input);
+    const sibling = await captureRequest({ ...input, child: "child-thread-b" });
+    const missing = await captureRequest({ ...input, headers: { "content-type": "application/json" } });
+    const overridden = await captureRequest({ ...input, provider: { ...provider, headers: { "X-OpenCode-Session": "operator-session" } } });
+    expect(first.url).toBe("https://opencode.ai/zen/v1/messages");
+    expect(first.headers.get(SESSION_HEADER)).toMatch(/^ocx_[0-9a-f]{32}$/);
+    expect(continued.headers.get(SESSION_HEADER)).toBe(first.headers.get(SESSION_HEADER));
+    expect(sibling.headers.get(SESSION_HEADER)).not.toBe(first.headers.get(SESSION_HEADER));
+    expect(missing.headers.has(SESSION_HEADER)).toBe(false);
+    expect(overridden.headers.get(SESSION_HEADER)).toBe("operator-session");
+    expect(provider.headers?.[SESSION_HEADER]).toBeUndefined();
+    for (const baseUrl of ["https://custom.example/v1", "https://opencode.ai.evil.test/zen/v1"]) {
+      const custom = { ...provider, baseUrl };
+      expect(resolveOpenCodeGoTransport(custom, "conversation")).toBe(custom);
+    }
+    expect(resolveOpenCodeGoTransport({ ...provider, authMode: "oauth" }, "conversation").headers?.[SESSION_HEADER]).toBeUndefined();
+  });
 
   for (const providerName of ["opencode-zen", "opencode-free"]) {
     for (const model of ["muse-spark-1.3", "muse-spark-1.2", "muse-spark-1.3-contributor-free", "muse-spark-1.2-contributor-free"]) {
