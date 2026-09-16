@@ -155,9 +155,9 @@ OpenCode Muse Responses routes use the [exact effort ladder](../catalog.md#openc
 
 ## OpenCode Zen Anthropic affinity
 
-The Zen registry recognizes `https://opencode.ai/zen/v1` with the `anthropic` adapter as an
-alternate destination. `src/providers/opencode-go-transport.ts` therefore derives the same
-conversation-scoped `x-opencode-session` header for a custom Anthropic Zen provider as for the
-Chat preset. Explicit operator headers win; absent conversation identity stays absent.
-Other destinations and OAuth/forward authentication do not gain Zen affinity.
-`tests/providers/opencode-go-session-header.test.ts` covers the translated Responses dispatch.
+`union-alpha` is hard-pinned to the Anthropic wire on `opencode-zen` and `opencode-free`.
+The Zen registry also recognizes `https://opencode.ai/zen/v1` with the `anthropic` adapter
+as an alternate destination, so a translated request still receives the conversation-scoped
+`x-opencode-session` header. Explicit operator headers win; absent conversation identity
+stays absent. Other destinations and OAuth/forward authentication do not gain Zen affinity.
+`tests/providers/opencode-go-session-header.test.ts` covers the pin and translated Responses dispatch.

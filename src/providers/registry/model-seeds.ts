@@ -381,6 +381,9 @@ export const OPENCODE_ZEN_MUSE_MODELS = [
   "muse-spark-1.3", "muse-spark-1.2",
   "muse-spark-1.3-contributor-free", "muse-spark-1.2-contributor-free",
 ];
+export const OPENCODE_ZEN_UNION_ALPHA_MODEL = "union-alpha";
+export const OPENCODE_ZEN_UNION_ALPHA_CONTEXT_WINDOW = 262_144;
+export const OPENCODE_ZEN_UNION_ALPHA_MAX_OUTPUT_TOKENS = 131_072;
 /*
  * DeepSeek's Codex ladder is low/high/max. With the V4 Pro GA release
  * (DeepSeek-V4-Pro-0813) the official thinking-mode table is IDENTICAL for both

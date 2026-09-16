@@ -52,6 +52,9 @@ import {
   OPENCODE_ZEN_TEXT_ONLY_MODELS,
   OPENCODE_ZEN_IMAGE_MODELS,
   OPENCODE_ZEN_MUSE_MODELS,
+  OPENCODE_ZEN_UNION_ALPHA_MODEL,
+  OPENCODE_ZEN_UNION_ALPHA_CONTEXT_WINDOW,
+  OPENCODE_ZEN_UNION_ALPHA_MAX_OUTPUT_TOKENS,
   META_MUSE_CONTEXT_WINDOW,
   META_MUSE_REASONING_EFFORTS,
   META_MUSE_REASONING_EFFORT_MAP,
@@ -912,6 +915,7 @@ export const PROVIDER_REGISTRY_EXTENDED: readonly ProviderRegistryEntry[] = [
     modelReasoningEfforts: {
       ...Object.fromEntries([...DEEPSEEK_GATEWAY_THINKING_MODELS, ...OPENCODE_FREE_DEEPSEEK_MODELS].map(id => [id, deepseekThinkingEffortsFor(id)])),
       ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, META_MUSE_REASONING_EFFORTS])),
+      [OPENCODE_ZEN_UNION_ALPHA_MODEL]: [],
     },
     modelReasoningEffortMap: {
       ...Object.fromEntries([...DEEPSEEK_GATEWAY_THINKING_MODELS, ...OPENCODE_FREE_DEEPSEEK_MODELS].map(id => [id, deepseekReasoningMapFor(id)])),
@@ -923,16 +927,20 @@ export const PROVIDER_REGISTRY_EXTENDED: readonly ProviderRegistryEntry[] = [
     modelContextWindows: {
       ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, META_MUSE_CONTEXT_WINDOW])),
       [DEEPSEEK_VISION_PREVIEW_MODEL]: 1_048_576,
+      [OPENCODE_ZEN_UNION_ALPHA_MODEL]: OPENCODE_ZEN_UNION_ALPHA_CONTEXT_WINDOW,
     },
     modelInputModalities: {
       ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, ["text", "image"] as string[]])),
       [DEEPSEEK_VISION_PREVIEW_MODEL]: ["text", "image"],
       ...Object.fromEntries(OPENCODE_ZEN_IMAGE_MODELS.map(id => [id, ["text", "image"] as string[]])),
+      [OPENCODE_ZEN_UNION_ALPHA_MODEL]: ["text", "image"],
     },
     noVisionModels: [...OPENCODE_ZEN_TEXT_ONLY_MODELS, ...DEEPSEEK_GATEWAY_THINKING_MODELS],
     // Same DeepSeek routes as the Go preset above, behind the same vendor, so they carry
     // the same json_schema rejection (#1338 / #1415).
     noJsonSchemaModels: [...DEEPSEEK_GATEWAY_THINKING_MODELS, ...OPENCODE_FREE_DEEPSEEK_MODELS],
+    modelMaxOutputTokens: { [OPENCODE_ZEN_UNION_ALPHA_MODEL]: OPENCODE_ZEN_UNION_ALPHA_MAX_OUTPUT_TOKENS },
+    modelDisplayNames: { [OPENCODE_ZEN_UNION_ALPHA_MODEL]: "Union Alpha Free (Zen)" },
     modelWireDefaults: Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, "openai-responses" as const])),
     staticHeaders: { "User-Agent": "opencodex" },
     preserveCustomDestination: true,
@@ -953,6 +961,7 @@ export const PROVIDER_REGISTRY_EXTENDED: readonly ProviderRegistryEntry[] = [
     modelReasoningEfforts: {
       ...Object.fromEntries(OPENCODE_FREE_DEEPSEEK_MODELS.map(id => [id, deepseekThinkingEffortsFor(id)])),
       ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, META_MUSE_REASONING_EFFORTS])),
+      [OPENCODE_ZEN_UNION_ALPHA_MODEL]: [],
     },
     modelReasoningEffortMap: {
       ...Object.fromEntries(OPENCODE_FREE_DEEPSEEK_MODELS.map(id => [id, deepseekReasoningMapFor(id)])),
@@ -964,11 +973,13 @@ export const PROVIDER_REGISTRY_EXTENDED: readonly ProviderRegistryEntry[] = [
     modelContextWindows: {
       ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, META_MUSE_CONTEXT_WINDOW])),
       [DEEPSEEK_VISION_PREVIEW_MODEL]: 1_048_576,
+      [OPENCODE_ZEN_UNION_ALPHA_MODEL]: OPENCODE_ZEN_UNION_ALPHA_CONTEXT_WINDOW,
     },
     modelInputModalities: {
       ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, ["text", "image"] as string[]])),
       [DEEPSEEK_VISION_PREVIEW_MODEL]: ["text", "image"],
       ...Object.fromEntries(OPENCODE_ZEN_IMAGE_MODELS.map(id => [id, ["text", "image"] as string[]])),
+      [OPENCODE_ZEN_UNION_ALPHA_MODEL]: ["text", "image"],
     },
     // Same Zen roster behind the same base URL, so it carries the same measured
     // text-only list rather than only its DeepSeek member (#1043).
@@ -977,6 +988,8 @@ export const PROVIDER_REGISTRY_EXTENDED: readonly ProviderRegistryEntry[] = [
     // the keyed tier's json_schema treatment and its reasoning contract rather than a
     // narrower table that silently falls behind whenever the keyed one is updated.
     noJsonSchemaModels: [...DEEPSEEK_GATEWAY_THINKING_MODELS, ...OPENCODE_FREE_DEEPSEEK_MODELS],
+    modelMaxOutputTokens: { [OPENCODE_ZEN_UNION_ALPHA_MODEL]: OPENCODE_ZEN_UNION_ALPHA_MAX_OUTPUT_TOKENS },
+    modelDisplayNames: { [OPENCODE_ZEN_UNION_ALPHA_MODEL]: "Union Alpha Free (Zen)" },
     modelWireDefaults: Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, "openai-responses" as const])),
     preserveCustomDestination: true,
   },

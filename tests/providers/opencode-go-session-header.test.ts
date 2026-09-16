@@ -32,15 +32,27 @@ function codexHeaders(child = "child-thread-a"): Record<string, string> {
 
 function upstreamResponse(url: string, stream = false): Response {
   if (url.endsWith("/messages")) {
-    return Response.json({
-      id: "msg_union_alpha",
-      type: "message",
-      role: "assistant",
-      model: "union-alpha",
-      content: [{ type: "text", text: "ok" }],
-      stop_reason: "end_turn",
-      usage: { input_tokens: 1, output_tokens: 1 },
-    });
+    if (!stream) {
+      return Response.json({
+        id: "msg_union_alpha",
+        type: "message",
+        role: "assistant",
+        model: "union-alpha",
+        content: [{ type: "text", text: "ok" }],
+        stop_reason: "end_turn",
+        usage: { input_tokens: 1, output_tokens: 1 },
+      });
+    }
+    const events = [
+      { type: "message_start", message: { id: "msg_union_alpha", type: "message", role: "assistant", content: [], model: "union-alpha", stop_reason: null, usage: { input_tokens: 1, output_tokens: 0 } } },
+      { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+      { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "ok" } },
+      { type: "content_block_stop", index: 0 },
+      { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 1 } },
+      { type: "message_stop" },
+    ];
+    const body = events.map((event) => "event: " + event.type + "\ndata: " + JSON.stringify(event) + "\n\n").join("");
+    return new Response(body, { headers: { "content-type": "text/event-stream" } });
   }
   if (stream && url.endsWith("/chat/completions")) {
     return new Response([
@@ -87,7 +99,7 @@ async function captureRequest(input: {
   globalThis.fetch = (async (requestInput: RequestInfo | URL, init?: RequestInit) => {
     const url = String(requestInput);
     requests.push({ url, headers: new Headers(init?.headers) });
-    return upstreamResponse(url, input.claude);
+    return upstreamResponse(url, Boolean(input.claude || input.nativeChat));
   }) as typeof fetch;
 
   const config = {
@@ -523,21 +535,37 @@ describe("OpenCode Zen Muse routing", () => {
     return { ...providerConfigSeed(getProviderRegistryEntry(name)!), apiKey: "test-key", ...overrides };
   }
 
-  test("Zen Anthropic routes preserve per-conversation affinity on Responses ingress", async () => {
-    const provider = zen("opencode-zen", { adapter: "anthropic", modelReasoningEfforts: { "union-alpha": [] } });
+  test("union-alpha stays on OpenCode Zen and uses Anthropic Messages", async () => {
+    for (const providerName of ["opencode-zen", "opencode-free"] as const) {
+      const provider = zen(providerName);
+      expect(provider.adapter).toBe("openai-chat");
+      expect(resolveWireProtocolOverride(providerName, "union-alpha", provider, "responses").adapter).toBe("anthropic");
+      const input = { providerName, model: "union-alpha", provider };
+      const first = await captureRequest(input);
+      const continued = await captureRequest(input);
+      const sibling = await captureRequest({ ...input, child: "child-thread-b" });
+      const chat = await captureRequest({ ...input, nativeChat: true });
+      const claude = await captureRequest({ ...input, claude: true, headers: codexHeaders() });
+      const missing = await captureRequest({ ...input, headers: { "content-type": "application/json" } });
+      const overridden = await captureRequest({ ...input, provider: { ...provider, headers: { "X-OpenCode-Session": "operator-session" } } });
+      for (const request of [first, continued, sibling, chat, claude]) {
+        expect(request.url).toBe("https://opencode.ai/zen/v1/messages");
+        expect(request.headers.get(SESSION_HEADER)).toMatch(/^ocx_[0-9a-f]{32}$/);
+      }
+      expect(continued.headers.get(SESSION_HEADER)).toBe(first.headers.get(SESSION_HEADER));
+      expect(sibling.headers.get(SESSION_HEADER)).not.toBe(first.headers.get(SESSION_HEADER));
+      expect(missing.headers.has(SESSION_HEADER)).toBe(false);
+      expect(overridden.headers.get(SESSION_HEADER)).toBe("operator-session");
+      expect(provider.headers?.[SESSION_HEADER]).toBeUndefined();
+    }
+  });
+
+  test("custom Anthropic Zen destinations still receive conversation affinity", async () => {
+    const provider = zen("opencode-zen", { adapter: "anthropic" });
     const input = { providerName: "zen-union", model: "union-alpha", provider };
     const first = await captureRequest(input);
-    const continued = await captureRequest(input);
-    const sibling = await captureRequest({ ...input, child: "child-thread-b" });
-    const missing = await captureRequest({ ...input, headers: { "content-type": "application/json" } });
-    const overridden = await captureRequest({ ...input, provider: { ...provider, headers: { "X-OpenCode-Session": "operator-session" } } });
     expect(first.url).toBe("https://opencode.ai/zen/v1/messages");
     expect(first.headers.get(SESSION_HEADER)).toMatch(/^ocx_[0-9a-f]{32}$/);
-    expect(continued.headers.get(SESSION_HEADER)).toBe(first.headers.get(SESSION_HEADER));
-    expect(sibling.headers.get(SESSION_HEADER)).not.toBe(first.headers.get(SESSION_HEADER));
-    expect(missing.headers.has(SESSION_HEADER)).toBe(false);
-    expect(overridden.headers.get(SESSION_HEADER)).toBe("operator-session");
-    expect(provider.headers?.[SESSION_HEADER]).toBeUndefined();
     for (const baseUrl of ["https://custom.example/v1", "https://opencode.ai.evil.test/zen/v1"]) {
       const custom = { ...provider, baseUrl };
       expect(resolveOpenCodeGoTransport(custom, "conversation")).toBe(custom);

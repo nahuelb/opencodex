@@ -501,14 +501,11 @@ headers. That is separate from the keyless desktop quota OpenCode advertises
 synthetic `Retry-After`; an upstream `Retry-After` still takes precedence. Same-key
 wait-and-retry remains opt-in via [`retryOn429`](/reference/configuration/).
 
-**Union Alpha uses Zen's Anthropic Messages endpoint.** Configure a separate provider with
-`adapter: "anthropic"` and `baseUrl: "https://opencode.ai/zen/v1"`, your Zen API key, and
-model ID `union-alpha`. Set `modelContextWindows.union-alpha` to `262144`,
-`modelMaxOutputTokens.union-alpha` to `131072`, and `modelInputModalities.union-alpha`
-to `["text", "image"]`. Set `modelReasoningEfforts.union-alpha` to `[]`: Zen advertises
-reasoning but no selectable effort levels. OpenCodex derives a conversation session header
-for this destination, including when the provider has a custom name. Keep a stable client
-conversation ID across turns. These limits and the endpoint are published in
+**Union Alpha on Zen uses the Anthropic Messages endpoint.** OpenCodex pins `union-alpha`
+on `opencode-zen` and `opencode-free` to `/zen/v1/messages`. Context is 262,144 tokens and
+max output is 131,072. Text and image input are supported. Zen advertises reasoning but no
+selectable effort levels. Session affinity uses the same conversation header as other Zen
+routes. These limits and the endpoint are published in
 [OpenCode's model metadata](https://github.com/anomalyco/models.dev/blob/dev/providers/opencode/models/union-alpha.toml).
 
 **Muse Spark on Zen uses the Responses endpoint.** OpenCodex routes Muse Spark 1.3 and 1.2,
