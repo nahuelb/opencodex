@@ -636,3 +636,9 @@ The raw provider editor round-trips `autoReviewModel` and `autoReviewModelOverri
 Cursor's Muse Spark 1.3 catalog, wire efforts, native image input, and price source follow the [Cursor catalog contract](providers/cursor.md#muse-spark-catalog).
 
 Responses request and attempt effort fields follow [passthrough effort logging](transports/responses.md#passthrough-effort-logging); missing historical fields remain unknown.
+
+`manualCompaction` is a persisted configuration setting. Its model and optional effort follow the
+[Responses trigger contract](transports/responses.md#manual-compaction-overrides). Dashboard Overview
+provides model and effort selectors with an explicit Save action. `GET /api/settings` returns
+the override or null; `PUT /api/settings` accepts a complete validated object or null to clear it.
+Save failure restores live settings and deletion provenance; the dashboard retains the draft for retry.

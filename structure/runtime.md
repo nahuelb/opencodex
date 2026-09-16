@@ -1,5 +1,8 @@
 # Runtime
 
+Manual Codex compaction uses a request-local model override when configured; the
+[Responses compaction contract](transports/responses.md#manual-compaction-overrides) owns its trigger and replay boundaries.
+
 Responses admission and finalization are composed through the
 [core module ownership](transports/responses.md#core-module-ownership). This surface retains its existing behavior.
 

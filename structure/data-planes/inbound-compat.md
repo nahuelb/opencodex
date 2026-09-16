@@ -335,3 +335,5 @@ Canonical Responses identity sanitation and narrowly scoped pre-output combo rec
 Cursor's Muse Spark 1.3 catalog, wire efforts, native image input, and price source follow the [Cursor catalog contract](../providers/cursor.md#muse-spark-catalog).
 
 Requests translated onto the Responses passthrough inherit its [final wire-effort logging](../transports/responses.md#passthrough-effort-logging), after provider effort mapping and stripping.
+
+The [manual compaction override](../transports/responses.md#manual-compaction-overrides) requires original Responses ingress; translated Chat and Messages calls retain their own routing.

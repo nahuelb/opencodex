@@ -149,3 +149,6 @@ The [explicit model-capability contract](config.md#explicit-per-model-capability
 Provider-scoped approval reviewer settings are projected by the [catalog owner](catalog.md#provider-scoped-approval-reviewer); this surface retains its existing routing, transport and account-selection behavior.
 
 The test-layout maps register the dedicated [Responses effort logging regression](transports/responses.md#passthrough-effort-logging) in the Responses domain.
+
+Manual Codex compaction can select a request-local model through the
+[existing Responses handlers](transports/responses.md#manual-compaction-overrides), while subsequent turns keep their conversation settings.

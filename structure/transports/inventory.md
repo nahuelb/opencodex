@@ -161,3 +161,5 @@ as an alternate destination, so a translated request still receives the conversa
 `x-opencode-session` header. Explicit operator headers win; absent conversation identity
 stays absent. Other destinations and OAuth/forward authentication do not gain Zen affinity.
 `tests/providers/opencode-go-session-header.test.ts` covers the pin and translated Responses dispatch.
+
+The [manual compaction override](responses.md#manual-compaction-overrides) selects a target before the existing native compact or routed Responses transport is resolved.

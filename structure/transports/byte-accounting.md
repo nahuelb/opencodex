@@ -43,3 +43,5 @@ Canonical Responses identity sanitation and narrowly scoped pre-output combo rec
 Cursor's Muse Spark 1.3 catalog, wire efforts, native image input, and price source follow the [Cursor catalog contract](../providers/cursor.md#muse-spark-catalog).
 
 Responses [effort metadata](responses.md#passthrough-effort-logging) reads only the final effort scalar; it does not serialize or retain another request-body copy.
+
+The [manual compaction override](responses.md#manual-compaction-overrides) changes model and effort scalars on the already parsed request, within the existing body-reader budget.

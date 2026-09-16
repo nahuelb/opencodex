@@ -386,3 +386,6 @@ Renamed fixed-key providers receive [missing reasoning metadata](../catalog.md#r
 Cursor's Muse Spark 1.3 catalog, wire efforts, native image input, and price source follow the [Cursor catalog contract](../providers/cursor.md#muse-spark-catalog).
 
 The provider guide documents [OpenCode Muse effort ladders](../catalog.md#opencode-muse-effort-ladders), and the management reference documents [Responses effort logging](../transports/responses.md#passthrough-effort-logging).
+
+The public server configuration reference documents the optional
+[manual compaction override](../transports/responses.md#manual-compaction-overrides). Its regression file is registered in both test-layout inventories.

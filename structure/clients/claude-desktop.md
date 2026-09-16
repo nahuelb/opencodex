@@ -155,3 +155,5 @@ The [explicit model-capability contract](../config.md#explicit-per-model-capabil
 Exact [model input declarations](../config.md#explicit-per-model-capability-declarations) now feed text-only eligibility and catalog hints; existing image-description/omission handling consumes them before the main upstream send.
 
 Provider-scoped approval reviewer settings are projected by the [catalog owner](../catalog.md#provider-scoped-approval-reviewer); this surface retains its existing routing, transport and account-selection behavior.
+
+The [manual compaction override](../transports/responses.md#manual-compaction-overrides) is scoped to Codex Responses metadata and original Responses ingress; Claude Messages replay retains its own routing.
