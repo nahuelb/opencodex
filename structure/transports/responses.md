@@ -693,3 +693,5 @@ What must not happen is a ladder that charges and then returns through a path th
 nor releases. That is not a lost send; it is a send the request never made, spending an allowance a
 later recovery in the same request then cannot have. `tests/lib/execution-budget-permits.test.ts`
 pins both ladder shapes against exactly that.
+
+Cursor's Muse Spark 1.3 catalog, wire efforts, native image input, and price source follow the [Cursor catalog contract](../providers/cursor.md#muse-spark-catalog).

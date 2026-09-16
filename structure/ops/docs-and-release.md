@@ -382,3 +382,5 @@ Exact [model input declarations](../config.md#explicit-per-model-capability-decl
 Provider-scoped approval reviewer settings are projected by the [catalog owner](../catalog.md#provider-scoped-approval-reviewer); this surface retains its existing routing, transport and account-selection behavior.
 
 Renamed fixed-key providers receive [missing reasoning metadata](../catalog.md#renamed-destination-reasoning-metadata) during derivation; explicit per-model entries and provider defaults retain precedence.
+
+Cursor's Muse Spark 1.3 catalog, wire efforts, native image input, and price source follow the [Cursor catalog contract](../providers/cursor.md#muse-spark-catalog).

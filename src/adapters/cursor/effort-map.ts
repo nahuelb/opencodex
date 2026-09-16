@@ -1,4 +1,5 @@
 import { composeCursorClaudeWireId, normalizeCursorClaudeId } from "./claude-id";
+import { CURSOR_CAPABILITIES } from "./catalog";
 
 /**
  * Per-model Cursor reasoning-effort mapping.
@@ -38,14 +39,14 @@ const CURSOR_MODEL_EFFORT_TIERS: Record<string, readonly string[]> = {
   "claude-opus-5-fast": ["low", "medium", "high"],
   "claude-sonnet-5": ["low", "medium", "high", "xhigh", "max"],
   "glm-5.2": ["high", "max"],
-  // 260825 live GetUsableModels. gemini-3.6-flash is the only Cursor model exposing `minimal`;
-  // listing it here is also what admits the suffix into CANONICAL_EFFORT_SUFFIXES below.
+  // 260825 live GetUsableModels first exposed `minimal` on Gemini 3.6 Flash.
   "gemini-3.6-flash": ["minimal", "low", "medium", "high"],
   "gemini-3.7-flash": ["low", "medium", "high"],
   // 260903 preemptive: gemini-3.8-flash seeded ahead of Cursor's lineup update, the same way
   // glm-5.3 was. Google documents low/medium/high with no `minimal` for this generation,
   // unlike 3.6. The seed is inert until Cursor's live roster lists the id.
   "gemini-3.8-flash": ["low", "medium", "high"],
+  "muse-spark-1.3": CURSOR_CAPABILITIES["muse-spark-1.3"]!.variants.regular!.levels,
   // Explicit-thinking variants (260825 live roster). Tiers are the rungs the wire actually
   // lists for each family, which is not always the same set the non-thinking id carries:
   // 4.6-opus thinks only at high/max, 4.5-opus only at high, 4.6-sonnet only at medium.

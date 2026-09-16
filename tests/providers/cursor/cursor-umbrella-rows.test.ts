@@ -76,6 +76,21 @@ describe("cursor umbrella picker rows (devlog 260828_cursor_umbrella_catalog)", 
     for (const row of cursorUmbrellaRows()) expect(seeded.get(row.id)).toBe(row.window);
   });
 
+  test("Muse Spark 1.3 publishes one 300K umbrella with all live effort rungs", () => {
+    const efforts = ["minimal", "low", "medium", "high", "xhigh", "max"];
+    expect(cursorUmbrellaRows().find(row => row.id === "muse-spark-1.3")).toEqual({
+      id: "muse-spark-1.3", displayName: "Muse Spark 1.3", window: 300_000,
+      efforts, maxModeVerified: false,
+    });
+    expect(CURSOR_STATIC_MODELS.filter(row => row.id.startsWith("muse-"))).toEqual([{
+      id: "muse-spark-1.3", contextWindow: 300_000, supportsReasoningEffort: true,
+      inputModalities: ["text", "image"],
+    }]);
+    expect(cursorModelReasoningEfforts()["muse-spark-1.3"]).toEqual(efforts);
+    expect(createCursorRequest(parsedFor("cursor/muse-spark-1.3", "high")).modelId)
+      .toBe("muse-spark-1.3-high");
+  });
+
   test("umbrella rows and seed efforts agree for every cataloged base", () => {
     const efforts = cursorModelReasoningEfforts();
     for (const row of cursorUmbrellaRows()) {

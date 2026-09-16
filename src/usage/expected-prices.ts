@@ -291,6 +291,7 @@ export const EXPECTED_PRICE_OVERLAYS: readonly ExpectedPriceOverlay[] = [
   { provider: "alibaba-token-plan-intl", modelId: "qwen3.8-max", cost4: QWEN38_MAX, source: QWEN38_MAX_PRICING, verifiedAt: "2026-08-04", status: "verified" },
   // Cursor Auto router — Cursor's published fixed token price (verified).
   { provider: "cursor", modelId: "auto", cost4: { input: 1.25, output: 6, cacheRead: 0.25, cacheWrite: 1.25 }, source: "https://docs.cursor.com/account/pricing + https://cursor.com/blog/aug-2025-pricing", verifiedAt: "2026-07-20", status: "verified" },
+  { provider: "cursor", modelId: "muse-spark-1.3", cost4: { input: 1.25, output: 4.25, cacheRead: 0.15, cacheWrite: 0 }, source: "https://cursor.com/docs/models-and-pricing#model-pricing", verifiedAt: "2026-09-16", status: "verified" },
   // Z.AI GLM family — the zai bundle's rows are all-zero upstream, and the four
   // provider surfaces below resolve overlays by exact provider id, so each one
   // needs its own rows (same pattern as kimi/moonshot/kimi-code). All rows are

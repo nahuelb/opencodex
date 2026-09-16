@@ -948,6 +948,14 @@ completions. The precedence is: hard wire pin → your explicit
 provider-wide adapter. To opt a model without a built-in default (for example
 `gpt-5.4-nano`) into Responses, set `"modelAdapters": { "gpt-5.4-nano": "openai-responses" }`.
 
+Cursor's catalog includes `cursor/muse-spark-1.3` with a 300K context window and native image input.
+Its live effort ladder is `minimal` / `low` / `medium` / `high` / `xhigh` / `max`.
+Each effort maps to `muse-spark-1.3-<effort>`; no Fast variant is advertised.
+Max effort does not enable Max Mode, which requires live account capability evidence.
+The model retains its `cursor/` picker prefix because its label is not Cursor-branded.
+[Cursor's pricing](https://cursor.com/docs/models-and-pricing#model-pricing) lists $1.25 input,
+$4.25 output, and $0.15 cached input per million tokens, with no cache-write charge.
+
 Cursor is tracked separately as an experimental adapter. `adapter: "cursor"` appears in `ocx init`
 and the dashboard Add Provider picker as an experimental local config entry with Cursor's static
 fallback model catalog metadata. When a Cursor access token is configured, opencodex uses Cursor's

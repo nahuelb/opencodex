@@ -177,6 +177,23 @@ describe("cursor umbrella catalog (devlog 260828_cursor_umbrella_catalog)", () =
   });
 
   describe("umbrella semantics", () => {
+    test("Muse Spark 1.3 resolves every observed effort without inventing Fast or Max Mode", () => {
+      expect(CURSOR_CAPABILITIES["muse-spark-1.3"]).toMatchObject({ defaultVariant: "regular" });
+      expect(Object.keys(CURSOR_CAPABILITIES["muse-spark-1.3"]!.variants)).toEqual(["regular"]);
+      expect(CURSOR_CAPABILITIES["muse-spark-1.3"]!.maxModeVerified).toBeUndefined();
+      for (const effort of ["minimal", "low", "medium", "high", "xhigh", "max"]) {
+        expect(resolveCursorSelection("muse-spark-1.3", effort)).toMatchObject({
+          wireId: `muse-spark-1.3-${effort}`, known: true, maxMode: false,
+        });
+        expect(resolveCursorSelection(`muse-spark-1.3-${effort}`, undefined).wireId)
+          .toBe(`muse-spark-1.3-${effort}`);
+      }
+      expect(resolveCursorSelection("muse-spark-1.3", "high", undefined, { fast: true }).wireId)
+        .toBe("muse-spark-1.3-high");
+      expect(resolveCursorSelection("muse-spark-1.3", "ultra", new Set()).maxMode).toBe(false);
+      expect(resolveCursorSelection("muse-spark-1.3", "ultra", new Set(["muse-spark-1.3"])).maxMode).toBe(true);
+    });
+
     test("thinking merges into the base: picking the base routes the thinking variant", () => {
       const resolved = resolveCursorSelection("claude-opus-5", "high");
       expect(resolved.wireId).toBe("claude-opus-5-thinking-high");

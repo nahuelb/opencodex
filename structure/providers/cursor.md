@@ -32,6 +32,20 @@ fall through to the separate native-local-exec dispatcher.
 
 ## Cursor parameterized models
 
+### Muse Spark catalog
+
+`src/adapters/cursor/catalog.ts` declares `muse-spark-1.3` as a regular 300K umbrella with
+`minimal`, `low`, `medium`, `high`, `xhigh`, and `max` efforts. The authenticated
+`GetUsableModels` roster verified on 2026-09-16 lists exactly `muse-spark-1.3-<effort>`
+for those six rungs, with no Fast or Max Mode evidence for Muse. Max Mode remains live-evidence-gated.
+`src/adapters/cursor/discovery.ts` preserves native image input, omits the unbranded picker label,
+and infers 300K for live effort spellings. `src/adapters/cursor/effort-map.ts` derives Muse's legacy
+effort helpers from the capability record. [Cursor's model page](https://cursor.com/docs/models/muse-spark-1-3)
+confirms the window and ladder; [its pricing table](https://cursor.com/docs/models-and-pricing#model-pricing)
+supplies the Cursor-specific overlay in `src/usage/expected-prices.ts`.
+
+### Router and Grok selections
+
 Cursor Router's parameterized `default` model is represented in Codex by four catalog rows:
 `cursor/auto` preserves Cursor's team/account default, while `cursor/auto-cost`,
 `cursor/auto-balance`, and `cursor/auto-intelligence` make each optimization level explicit.

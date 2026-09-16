@@ -38,6 +38,7 @@ describe("cursor picker labels reach the catalog", () => {
     expect(labels["grok-4.6"]).toBe("Cursor Grok 4.6");
     expect(labels["grok-4.5"]).toBe("Cursor Grok 4.5");
     expect(labels).not.toHaveProperty("kimi-k3");
+    expect(labels).not.toHaveProperty("muse-spark-1.3");
     expect(labels).not.toHaveProperty("claude-opus-5");
     expect(labels).not.toHaveProperty("auto");
     expect(labels).not.toHaveProperty("composer-2.5");
@@ -47,6 +48,7 @@ describe("cursor picker labels reach the catalog", () => {
     const seeded = providerConfigSeed(cursorEntry());
     expect(configuredModelDisplayName(seeded, "grok-4.6")).toBe("Cursor Grok 4.6");
     expect(configuredModelDisplayName(seeded, "kimi-k3")).toBeUndefined();
+    expect(configuredModelDisplayName(seeded, "muse-spark-1.3")).toBeUndefined();
     expect(configuredModelDisplayName(seeded, "claude-4-sonnet-1m")).toBeUndefined();
     expect(configuredModelDisplayName(seeded, "composer-2.5-fast")).toBeUndefined();
   });

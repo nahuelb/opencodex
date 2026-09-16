@@ -32,6 +32,7 @@ export function inferCursorContextWindow(modelId: string): number {
   if (id === "glm-5.3" || id === "glm-5.2") return CONTEXT_1M;
   // 260902: every Fable is a 1M model; catch live spellings the seed does not carry.
   if (id.includes("fable")) return CONTEXT_1M;
+  if (/^(?:cursor-)?muse-spark-1\.3(?:-|$)/.test(id)) return 300_000;
   if (id.startsWith("gpt-5.6-")) return CONTEXT_1M;
   if (id.startsWith("gpt-5") || id === "gpt-5-codex") return CONTEXT_272K;
   if (id.startsWith("grok-4.5") || id.startsWith("grok-4.6")) return 500_000;

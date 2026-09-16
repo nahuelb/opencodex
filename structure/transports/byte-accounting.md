@@ -39,3 +39,5 @@ These optimizations do not add request queues, retry policies, or RSS-based admi
 
 Translated audio/file admission follows the [final-adapter input contract](../adapters/registry.md#untranslated-input-media); native raw passthrough remains separate.
 Canonical Responses identity sanitation and narrowly scoped pre-output combo recovery follow [request-local target compatibility](../runtime.md#request-local-target-compatibility); other adapter contracts remain unchanged.
+
+Cursor's Muse Spark 1.3 catalog, wire efforts, native image input, and price source follow the [Cursor catalog contract](../providers/cursor.md#muse-spark-catalog).

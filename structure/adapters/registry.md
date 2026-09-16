@@ -191,3 +191,5 @@ wire defaults. Zen and Free presets identify as `opencodex` and share the
 Client session headers and Claude metadata supply identity; shared prompt cohorts never
 substitute for a conversation. Zen omits the header without a real conversation, while Go
 falls back to the request-scoped lane it needs on every request.
+
+Cursor's Muse Spark 1.3 catalog, wire efforts, native image input, and price source follow the [Cursor catalog contract](../providers/cursor.md#muse-spark-catalog).

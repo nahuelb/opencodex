@@ -331,3 +331,5 @@ Modern `tool` images continue through the existing following-user carrier. These
 an OpenCodex conversion limit, not a provider capability claim. Final Responses-to-adapter
 admission follows the [registry contract](../adapters/registry.md#untranslated-input-media).
 Canonical Responses identity sanitation and narrowly scoped pre-output combo recovery follow [request-local target compatibility](../runtime.md#request-local-target-compatibility); other adapter contracts remain unchanged.
+
+Cursor's Muse Spark 1.3 catalog, wire efforts, native image input, and price source follow the [Cursor catalog contract](../providers/cursor.md#muse-spark-catalog).

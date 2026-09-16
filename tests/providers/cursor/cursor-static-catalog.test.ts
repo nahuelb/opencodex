@@ -78,6 +78,7 @@ describe("Cursor static Codex catalog", () => {
     expect(namespaced).toContain("cursor/gpt-5.6-luna");
     expect(namespaced).toContain("cursor/glm-5.2");
     expect(namespaced).toContain("cursor/kimi-k2.7-code");
+    expect(namespaced).toContain("cursor/muse-spark-1.3");
     expect(namespaced).not.toContain("cursor/grok-4.20");
     expect(namespaced).not.toContain("cursor/grok-4.3");
 
@@ -95,6 +96,11 @@ describe("Cursor static Codex catalog", () => {
     expect(entries.find(item => item.slug === "cursor/gpt-5.6-terra")?.context_window).toBe(1_000_000);
     expect(entries.find(item => item.slug === "cursor/gpt-5.6-luna")?.context_window).toBe(1_000_000);
     expect(entries.find(item => item.slug === "cursor/glm-5.2")?.context_window).toBe(1_000_000);
+    expect(entries.find(item => item.slug === "cursor/muse-spark-1.3")).toMatchObject({
+      context_window: 300_000,
+      input_modalities: ["text", "image"],
+      supported_reasoning_levels: ["minimal", "low", "medium", "high", "xhigh", "max", "ultra"].map(effort => ({ effort })),
+    });
     expect(entries.find(item => item.slug === "cursor/composer-2.5-fast")?.context_window).toBe(200_000);
     expect(entries.find(item => item.slug === "cursor/gpt-5.5")?.supported_reasoning_levels)
       .toMatchObject([{ effort: "low" }, { effort: "medium" }, { effort: "high" }, { effort: "max" }, { effort: "ultra" }]);

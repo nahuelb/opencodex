@@ -23,6 +23,22 @@ import {
 } from "../../../src/adapters/cursor/discovery";
 
 describe("Cursor discovery metadata", () => {
+  test("live Muse effort ids retain the seeded base and infer its 300K window", () => {
+    for (const effort of ["minimal", "low", "medium", "high", "xhigh", "max"]) {
+      const liveId = `muse-spark-1.3-${effort}`;
+      for (const id of [liveId, `cursor-${liveId}`]) {
+        const filtered = filterCursorConfiguredModelsByLiveDiscovery(CURSOR_STATIC_MODELS, [id]);
+        expect(filtered.find(model => model.id === "muse-spark-1.3")).toMatchObject({ contextWindow: 300_000 });
+        expect(inferCursorContextWindow(id)).toBe(300_000);
+      }
+    }
+    expect(inferCursorContextWindow("muse-spark-1.3")).toBe(300_000);
+    expect(inferCursorContextWindow("muse-spark-1.30")).toBe(CURSOR_DEFAULT_CONTEXT_WINDOW);
+    expect(filterCursorConfiguredModelsByLiveDiscovery(CURSOR_STATIC_MODELS, ["muse-spark-1.2-high"])
+      .some(model => model.id === "muse-spark-1.3")).toBe(false);
+    expect(CURSOR_NO_VISION_MODELS).not.toContain("muse-spark-1.3");
+  });
+
   test("no-vision list is a curated explicit subset of the static seed", () => {
     const ids = new Set(cursorModelIds(CURSOR_STATIC_MODELS));
     expect([...CURSOR_NO_VISION_MODELS]).toEqual([

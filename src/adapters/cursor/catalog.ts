@@ -56,6 +56,7 @@ const K = 1_000;
 const CONTEXT_200K = 200 * K;
 const CONTEXT_256K = 256 * K;
 const CONTEXT_272K = 272 * K;
+const CONTEXT_300K = 300 * K;
 const CONTEXT_500K = 500 * K;
 const CONTEXT_1M = 1_000 * K;
 /** Gemini publishes the exact power-of-two window, not a rounded 1M. */
@@ -210,6 +211,12 @@ export const CURSOR_CAPABILITIES: Record<string, CursorCapability> = {
     window: CONTEXT_GEMINI,
     defaultVariant: "regular",
     variants: { regular: { levels: ["low", "medium", "high"] } },
+  },
+  "muse-spark-1.3": {
+    displayName: "Muse Spark 1.3",
+    window: CONTEXT_300K,
+    defaultVariant: "regular",
+    variants: { regular: { levels: ["minimal", "low", "medium", "high", "xhigh", "max"] } },
   },
   "kimi-k3": {
     displayName: "Kimi K3",

@@ -298,8 +298,18 @@ describe("resolveMatchedPrice", () => {
     expect(resolveMatchedPrice("openrouter", "anthropic-claude-3.5-sonnet")).toBeNull();
   });
 
-  test("16. shipped overlay membership: 121 keys, including canonical Fable 5.1, Opus 5 and compatibility prices", () => {
-    expect(EXPECTED_PRICE_OVERLAYS.length).toBe(121);
+  test("Cursor Muse Spark 1.3 has Cursor's published prices", () => {
+    expect(findExpectedPriceOverlay("cursor", "muse-spark-1.3")).toMatchObject({
+      cost4: { input: 1.25, output: 4.25, cacheRead: 0.15, cacheWrite: 0 },
+      source: "https://cursor.com/docs/models-and-pricing#model-pricing",
+      status: "verified", verifiedAt: "2026-09-16",
+    });
+    expect(resolveMatchedPrice("cursor", "muse-spark-1.3")?.cost4)
+      .toEqual({ input: 1.25, output: 4.25, cacheRead: 0.15, cacheWrite: 0 });
+  });
+
+  test("16. shipped overlay membership: 122 keys, including canonical Fable 5.1, Opus 5 and compatibility prices", () => {
+    expect(EXPECTED_PRICE_OVERLAYS.length).toBe(122);
     expect(EXPECTED_PRICE_OVERLAYS.some(row => row.status === "unverified")).toBe(false);
     const keys = new Set(EXPECTED_PRICE_OVERLAYS.map(row => `${row.provider}/${row.modelId}`));
     for (const expected of [
@@ -370,6 +380,7 @@ describe("resolveMatchedPrice", () => {
       "alibaba-token-plan/qwen3.8-max",
       "alibaba-token-plan-intl/qwen3.8-max",
       "cursor/auto",
+      "cursor/muse-spark-1.3",
       // Z.AI GLM family — the zai bundle is all-zero upstream, so each exposing
       // provider surface carries its own verified-derived rows (z.ai USD list).
       "zai/glm-5.3",
