@@ -300,9 +300,26 @@ The shared Responses path follows the [bounded multipart recovery contract](suba
 
 ## Ultra reasoning level
 
-Ultra is always advertised in the catalog regardless of the `multi_agent_v2` toggle. The v2 toggle
+Synthetic ultra is independent of the `multi_agent_v2` toggle, subject to exact provider ladders below. The v2 toggle
 controls only the multi-agent collab surface, not ultra visibility. The `nativeEffortClamp` function
 wire-clamps ultra/max to each model's real top rung (e.g. gpt-5.5 ultra → xhigh on the wire).
+
+### OpenCode Muse effort ladders
+
+`src/providers/registry/entries-extended.ts` declares Meta's `minimal`, `low`, `medium`, `high`,
+and `xhigh` ladder and identity wire map for every Zen Muse 1.3/1.2 model, including the free
+contributor variants, on both Zen and Free presets. Go's 1.3/1.2 contributor models carry the
+same declarations in `src/providers/registry/entries-core.ts`. No default override is added;
+the normal picker fallback remains `medium`.
+
+`src/codex/catalog/derive-entry.ts` and `src/codex/catalog/build-entries.ts` preserve Go's exact
+ladders and Zen/Free Muse ladders during derivation and sync, without adding synthetic `max`
+or `ultra`. Sync uses recorded model provenance for aliases and the slug for older rows.
+Existing caller values above `xhigh` clamp to `xhigh` on the routed Responses wire.
+The regression cases are in `tests/codex-integration/catalog-go-exact-efforts.test.ts` and
+`tests/providers/opencode-go-muse-context.test.ts`.
+
+### Effort policies
 
 `effortCap` and `subagentEffortCap` are hard ceilings applied on the V2 path
 (`src/server/effort-policy.ts`): they lower or preserve the requested effort rather than rejecting

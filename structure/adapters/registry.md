@@ -193,3 +193,5 @@ substitute for a conversation. Zen omits the header without a real conversation,
 falls back to the request-scoped lane it needs on every request.
 
 Cursor's Muse Spark 1.3 catalog, wire efforts, native image input, and price source follow the [Cursor catalog contract](../providers/cursor.md#muse-spark-catalog).
+
+Muse reasoning metadata follows the [exact catalog ladder](../catalog.md#opencode-muse-effort-ladders); its selected Responses adapter publishes [wire-effort metadata](../transports/responses.md#passthrough-effort-logging) before dispatch.

@@ -428,3 +428,5 @@ The combo may advance to its next eligible unattempted target before output comm
 Regression coverage: `tests/responses/responses-forward-prompt-envelope.test.ts`, `tests/routing/router-combo-failover-classification.test.ts`, and `tests/server/server-combo-failover-e2e.test.ts`.
 
 Cursor's Muse Spark 1.3 catalog, wire efforts, native image input, and price source follow the [Cursor catalog contract](providers/cursor.md#muse-spark-catalog).
+
+OpenCode Muse uses the [exact catalog ladder](catalog.md#opencode-muse-effort-ladders); Responses adapters publish [final wire-effort metadata](transports/responses.md#passthrough-effort-logging) per attempt.

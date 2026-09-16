@@ -144,3 +144,5 @@ Translated Chat request construction uses the [inline-image budget](../transport
 
 Translated audio/file admission follows the [final-adapter input contract](../adapters/registry.md#untranslated-input-media); native raw passthrough remains separate.
 Canonical Responses identity sanitation and narrowly scoped pre-output combo recovery follow [request-local target compatibility](../runtime.md#request-local-target-compatibility); other adapter contracts remain unchanged.
+
+Generic Responses [wire-effort logging](../transports/responses.md#passthrough-effort-logging) belongs to the passthrough adapter; Cursor continues to use its native execution path.

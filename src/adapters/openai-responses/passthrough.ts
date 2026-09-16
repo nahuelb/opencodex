@@ -448,6 +448,11 @@ export function createResponsesPassthroughAdapter(provider: OcxProviderConfig): 
       // HTTP and the WebSocket outbound, because the WS path transports this same request
       // instead of rebuilding it.
       const body = JSON.stringify(finalBody);
+      const wireEffort = isPlainObject(finalBody) && isPlainObject(finalBody.reasoning)
+        ? finalBody.reasoning.effort : undefined;
+      const reasoningLog = astraReasoningLog ?? (typeof wireEffort === "string" && wireEffort
+        ? { effectiveEffort: wireEffort, wireField: "reasoning.effort" as const, wireValue: wireEffort }
+        : undefined);
       const releaseBodyObservation = translatorBudget.observeExternallyCapped(
         "passthrough_serialization",
         Buffer.byteLength(body, "utf8"),
@@ -466,7 +471,7 @@ export function createResponsesPassthroughAdapter(provider: OcxProviderConfig): 
         ...(plaintextV2AgentMessageAliasedToolNames ? { plaintextV2AgentMessageAliasedToolNames } : {}),
         ...(convertedMuseToolNameAliases ? { convertedMuseToolNameAliases } : {}),
         ...(tierLog ? { tierLog } : {}),
-        ...(astraReasoningLog ? { reasoningLog: astraReasoningLog } : {}),
+        ...(reasoningLog ? { reasoningLog } : {}),
         ...(astraEffortCache ? { astraEffortCache } : {}),
       };
       attachSideChatCache(request, cacheDecision);

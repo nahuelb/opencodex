@@ -150,3 +150,5 @@ Translated audio/file admission follows the [final-adapter input contract](../ad
 Canonical Responses identity sanitation and narrowly scoped pre-output combo recovery follow [request-local target compatibility](../runtime.md#request-local-target-compatibility); other adapter contracts remain unchanged.
 
 Cursor's Muse Spark 1.3 catalog, wire efforts, native image input, and price source follow the [Cursor catalog contract](../providers/cursor.md#muse-spark-catalog).
+
+OpenCode Muse Responses routes use the [exact effort ladder](../catalog.md#opencode-muse-effort-ladders) and [per-attempt wire metadata](responses.md#passthrough-effort-logging); transport selection is unchanged.
