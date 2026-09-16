@@ -617,7 +617,7 @@ dönüş model kataloğu meta verileriyle deneysel bir yerel yapılandırma gird
 olarak görünür. Bir Cursor erişim belirteci yapılandırıldığında opencodex
 Cursor'ın canlı HTTP/2 aktarımını kullanır. Paketlenmiş geri dönüş tohumu
 `gpt-5.6-sol` / `terra` / `luna` (1M bağlam), `grok-4.5` / `grok-4.5-fast`
-(500K) ve `kimi-k3` (262K) içerir; canlı keşif hesap için hangilerinin görünür
+(256K) ve `kimi-k3` (262K) içerir; canlı keşif hesap için hangilerinin görünür
 kalacağına karar verir. Cursor, Kimi K3'ü yalnızca çaba sonekli hat kimlikleri
 olarak sunar, bu nedenle `cursor/kimi-k3` bir `low` / `high` / `max` merdiveni
 gösterir ve modelin belgelenmiş API varsayılanıyla eşleşecek şekilde varsayılan

@@ -157,7 +157,7 @@ meta verileri sağladığı GPT-5.6 için kullanılır.
 | Codex girişi (açık Daybreak iletme satırı) | Yalnızca tam `customModels` satırı kurallı `openai` sağlayıcısında yapılandırıldığında `openai/gpt-daybreak-blue-latest`. Daybreak hat kimliğini korur ve sabitlenmiş Sol yetenek anlık görüntüsünü kullanır (922.000 bağlam; 829.800 otomatik sıkıştırma). |
 | OpenAI (API anahtarı) | Tam olarak on ad alanlı satır: `gpt-5.5`, `gpt-5.6`, Sol/Terra/Luna, üç `*-pro` sanal kimliği ve iki Daybreak takma adı (onunun tümü için 922.000 bağlam; 922.000 maksimum girdi) |
 | OpenRouter | `openrouter/openai/gpt-5.6-sol`, `openrouter/openai/gpt-5.6-terra`, `openrouter/openai/gpt-5.6-luna` (922.000) |
-| Cursor | Statik geri dönüş `cursor/gpt-5.6-sol`, `cursor/gpt-5.6-terra` ve `cursor/gpt-5.6-luna` (1.000.000) artı `cursor/grok-4.5` ve `cursor/grok-4.5-fast` (500.000) içerir; canlı hesap keşfi hangilerinin görünür kalacağına karar verir. |
+| Cursor | Statik geri dönüş `cursor/gpt-5.6-sol`, `cursor/gpt-5.6-terra` ve `cursor/gpt-5.6-luna` (1.000.000) artı `cursor/grok-4.5` ve `cursor/grok-4.5-fast` (256.000) içerir; canlı hesap keşfi hangilerinin görünür kalacağına karar verir. |
 | xAI | Canlı keşif yetkilidir. Geri dönüş kataloğu `xai/grok-4.6` içerir ve varsayılan olarak `xai/grok-4.5`'tir; her ikisinin de 500.000 tokenlik pencereleri vardır. Grok 4.6, `low` / `medium` / `high` / `xhigh` (yukarı akış varsayılanı: `high`) sunarken, Grok 4.5 `high` ile durur. |
 
 Sabitlenmiş GPT-5.6 girdileri tam yukarı akış merdivenini korur. Sol ve Terra

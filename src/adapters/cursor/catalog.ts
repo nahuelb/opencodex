@@ -57,7 +57,6 @@ const CONTEXT_200K = 200 * K;
 const CONTEXT_256K = 256 * K;
 const CONTEXT_272K = 272 * K;
 const CONTEXT_300K = 300 * K;
-const CONTEXT_500K = 500 * K;
 const CONTEXT_1M = 1_000 * K;
 /** Gemini publishes the exact power-of-two window, not a rounded 1M. */
 const CONTEXT_GEMINI = 1_048_576;
@@ -227,7 +226,7 @@ export const CURSOR_CAPABILITIES: Record<string, CursorCapability> = {
   },
   "grok-4.5": {
     displayName: "Cursor Grok 4.5",
-    window: CONTEXT_500K,
+    window: CONTEXT_256K,
     defaultVariant: "regular",
     wirePrefix: "cursor-",
     variants: {
@@ -237,7 +236,7 @@ export const CURSOR_CAPABILITIES: Record<string, CursorCapability> = {
   },
   "grok-4.6": {
     displayName: "Cursor Grok 4.6",
-    window: CONTEXT_500K,
+    window: CONTEXT_256K,
     defaultVariant: "regular",
     wirePrefix: "cursor-",
     variants: {

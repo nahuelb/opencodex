@@ -969,13 +969,18 @@ The model retains its `cursor/` picker prefix because its label is not Cursor-br
 [Cursor's pricing](https://cursor.com/docs/models-and-pricing#model-pricing) lists $1.25 input,
 $4.25 output, and $0.15 cached input per million tokens, with no cache-write charge.
 
+Cursor Grok 4.5 and 4.6 have a 256,000-token context window, including Fast variants, per
+[Cursor's model documentation](https://cursor.com/docs/models/grok-4-6). Startup corrects saved
+500,000-token defaults for these models; other custom windows stay unchanged. This sets the
+default Codex compaction threshold to 230,400 tokens. Cursor's separate replay byte limit still applies.
+
 Cursor is tracked separately as an experimental adapter. `adapter: "cursor"` appears in `ocx init`
 and the dashboard Add Provider picker as an experimental local config entry with Cursor's static
 fallback model catalog metadata. When a Cursor access token is configured, opencodex uses Cursor's
 live HTTP/2 transport. Set `upstreamHttpVersion: "http1.1"` when a proxy requires Cursor's HTTP/1.1
 compatibility path; the setting covers both inference and live model discovery and is exposed at
 **Providers → Cursor → Settings → Cursor transport**. Its bundled fallback seed includes `gpt-5.6-sol` / `terra` / `luna` (1M context),
-regular/Fast rows for Grok 4.5 and 4.6 (500K), and `kimi-k3` (262K); live discovery decides which
+regular/Fast rows for Grok 4.5 and 4.6 (256K), and `kimi-k3` (262K); live discovery decides which
 remain visible for the account. Grok 4.6 exposes `low` / `medium` / `high` / `xhigh` in both forms,
 while 4.5 stops at `high`. Fast requests send the matching base Grok model with separate `effort`
 and `fast=true` `requested_model` parameters; flattened `cursor-grok-{version}-{effort}-fast` ids

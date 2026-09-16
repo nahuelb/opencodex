@@ -77,6 +77,12 @@ const INTENTIONAL_THINKING_DEFAULTS = new Set(
 );
 
 describe("cursor umbrella catalog (devlog 260828_cursor_umbrella_catalog)", () => {
+  test("Grok umbrella rows use Cursor's 256k context window", () => {
+    for (const id of ["grok-4.5", "grok-4.6"]) {
+      expect(cursorUmbrellaRows().find(row => row.id === id)?.window).toBe(256_000);
+    }
+  });
+
   describe("back-compat oracle: byte-equal wire ids for every legacy id x effort", () => {
     for (const id of LEGACY_EFFORT_IDS) {
       if (INTENTIONAL_THINKING_DEFAULTS.has(id)) continue;

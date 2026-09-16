@@ -46,6 +46,11 @@ supplies the Cursor-specific overlay in `src/usage/expected-prices.ts`.
 
 ### Router and Grok selections
 
+Cursor Grok 4.5 and 4.6 use 256,000-token windows in both the umbrella catalog and discovery
+fallback, including Fast variants. These are Cursor-specific limits, independent of xAI's
+direct model windows. Startup repairs saved 500,000-token defaults for these four model IDs;
+other saved values and providers retain their settings. See `src/providers/stale-context-window-migration.ts`.
+
 Cursor Router's parameterized `default` model is represented in Codex by four catalog rows:
 `cursor/auto` preserves Cursor's team/account default, while `cursor/auto-cost`,
 `cursor/auto-balance`, and `cursor/auto-intelligence` make each optimization level explicit.

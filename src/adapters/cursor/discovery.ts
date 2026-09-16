@@ -35,8 +35,7 @@ export function inferCursorContextWindow(modelId: string): number {
   if (/^(?:cursor-)?muse-spark-1\.3(?:-|$)/.test(id)) return 300_000;
   if (id.startsWith("gpt-5.6-")) return CONTEXT_1M;
   if (id.startsWith("gpt-5") || id === "gpt-5-codex") return CONTEXT_272K;
-  if (id.startsWith("grok-4.5") || id.startsWith("grok-4.6")) return 500_000;
-  if (id.startsWith("grok-")) return CONTEXT_256K;
+  if (/^(?:cursor[/-])?grok-/.test(id)) return CONTEXT_256K;
   if (id.includes("claude")) return CONTEXT_200K;
   return CURSOR_DEFAULT_CONTEXT_WINDOW;
 }

@@ -191,7 +191,9 @@ describe("Cursor discovery metadata", () => {
     expect(inferCursorContextWindow("gemini-3.5-flash")).toBe(1_000_000);
     expect(inferCursorContextWindow("glm-5.2")).toBe(1_000_000);
     expect(inferCursorContextWindow("grok-4.3")).toBe(256_000);
-    expect(inferCursorContextWindow("grok-4.6")).toBe(500_000);
+    for (const id of ["grok-4.5", "grok-4.6", "grok-4.6-fast", "cursor-grok-4.6-xhigh-fast", "cursor/grok-4.6"]) {
+      expect(inferCursorContextWindow(id)).toBe(256_000);
+    }
     expect(inferCursorContextWindow("gpt-5.5")).toBe(272_000);
   });
 

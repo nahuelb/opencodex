@@ -33,16 +33,11 @@ export interface StaleContextWindowProjection {
   warnings: string[];
 }
 
-/**
- * Cognition windows corrected against a live `GetCascadeModelConfigs` response.
- *
- * The shipped table had been assembled from each model's ORIGINAL vendor window
- * rather than from what Cognition serves, so the Claude rows claimed 200k against
- * an actual 1M and Grok claimed 256k against 500k. Cognition documents no window
- * anywhere, so the per-account catalog is the only first-party source; these are
- * the degraded-mode figures, and live discovery supersedes them when it runs.
- */
 export const STALE_CONTEXT_WINDOWS: readonly StaleContextWindow[] = [
+  { provider: "cursor", model: "grok-4.5", from: 500_000, to: 256_000 },
+  { provider: "cursor", model: "grok-4.5-fast", from: 500_000, to: 256_000 },
+  { provider: "cursor", model: "grok-4.6", from: 500_000, to: 256_000 },
+  { provider: "cursor", model: "grok-4.6-fast", from: 500_000, to: 256_000 },
   { provider: "devin", model: "swe-1-7", from: 256_000, to: 262_000 },
   { provider: "devin", model: "swe-1-7-lightning", from: 256_000, to: 202_752 },
   { provider: "devin", model: "gpt-5-6-sol", from: 1_050_000, to: 1_000_000 },
@@ -89,4 +84,3 @@ export function projectStaleContextWindows(
 
   return { config, changed: repaired.size > 0, warnings };
 }
-

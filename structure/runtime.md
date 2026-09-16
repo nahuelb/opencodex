@@ -212,6 +212,11 @@ Provider-scoped capability hints remain authoritative when discovery returns an 
 capabilities. In particular, `src/providers/registry/entries-core.ts` assigns OpenCode Go's live
 `deepseek-v4.1-flash` route the official 1,048,576-token window instead of the conservative 128k
 routed-model fallback.
+
+`src/providers/stale-context-window-migration.ts` repairs known incorrect saved defaults at startup,
+including Cursor Grok's 500,000-to-256,000 correction. Values that differ from the old default
+and provider rows with a different adapter are preserved; see [Cursor context metadata](providers/cursor.md#router-and-grok-selections).
+
 The same registry declares the first-party `deepseek-flash` model with `text` and `image` input,
 so it bypasses the vision sidecar by default; explicit `noVisionModels` or text-only declarations
 remain authoritative. First-party `deepseek-chat`, `deepseek-reasoner`, and `deepseek-v4-flash`

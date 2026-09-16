@@ -404,7 +404,7 @@ Responses API 経由にルーティングし、他の Copilot モデルはすべ
 Cursor は別の実験的アダプターとして追跡します。`adapter: "cursor"` は `ocx init` とダッシュボード Add
 Provider ピッカーに実験的 local config 項目として表示され、Cursor の静的フォールバックモデルカタログ
 メタデータを保存します。Cursor アクセストークンを設定すると opencodex は Cursor ライブ HTTP/2 トランスポートを
-使います。バンドル済みフォールバックリストには 1M コンテキストの `gpt-5.6-sol` / `terra` / `luna`、500K コンテキストの
+使います。バンドル済みフォールバックリストには 1M コンテキストの `gpt-5.6-sol` / `terra` / `luna`、256K コンテキストの
 Grok 4.5 / 4.6 の通常・Fast 行、262K コンテキストの `kimi-k3` が含まれ、ライブ探索結果に基づき現在の
 アカウントに表示するモデルを決定します。Grok 4.6 は両形式で `low` / `medium` / `high` / `xhigh` を公開し、
 4.5 は `high` までです。Fast リクエストは対応する Grok ベースモデルを、独立した `effort` と `fast=true` の
