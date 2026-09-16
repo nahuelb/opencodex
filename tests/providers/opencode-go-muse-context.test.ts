@@ -11,7 +11,40 @@ import { describe, expect, test } from "bun:test";
 import { applyProviderConfigHints } from "../../src/codex/catalog";
 import { getProviderRegistryEntry, PROVIDER_REGISTRY } from "../../src/providers/registry";
 import { providerConfigSeed } from "../../src/providers/derive";
-import type { OcxProviderConfig } from "../../src/types";
+import type { OcxConfig, OcxProviderConfig } from "../../src/types";
+import { OPENCODE_ZEN_MUSE_MODELS } from "../../src/providers/registry/model-seeds";
+import { mapRoutedResponsesReasoningEffort } from "../../src/adapters/openai-responses/reasoning";
+import { routeModel } from "../../src/router";
+
+for (const provider of ["opencode-zen", "opencode-free", "opencode-go"]) {
+  const models = provider === "opencode-go"
+    ? ["muse-spark-1.3-contributor", "muse-spark-1.2-contributor"] : OPENCODE_ZEN_MUSE_MODELS;
+  for (const model of models) {
+    test(`${provider}/${model} declares exact Muse efforts with identity wire values`, () => {
+      const entry = getProviderRegistryEntry(provider)!;
+      const config = providerConfigSeed(entry);
+      const efforts = ["minimal", "low", "medium", "high", "xhigh"];
+      expect(entry.modelReasoningEfforts?.[model]).toEqual(efforts);
+      expect(config.modelReasoningEfforts?.[model]).toEqual(efforts);
+      expect(config.modelReasoningEffortMap?.[model]).toEqual(Object.fromEntries(efforts.map(effort => [effort, effort])));
+      expect(config.modelDefaultReasoningEfforts?.[model]).toBeUndefined();
+      for (const effort of efforts) {
+        const body = { model, reasoning: { effort } };
+        expect(mapRoutedResponsesReasoningEffort(body, config, model)).toEqual(body);
+      }
+      for (const effort of ["max", "ultra"]) {
+        expect(mapRoutedResponsesReasoningEffort({ model, reasoning: { effort } }, config, model))
+          .toEqual({ model, reasoning: { effort: "xhigh" } });
+      }
+      delete config.modelReasoningEfforts?.[model];
+      delete config.modelReasoningEffortMap?.[model];
+      const route = routeModel({ providers: { [provider]: config } } as OcxConfig, `${provider}/${model}`);
+      expect(route.provider.modelReasoningEfforts?.[model]).toEqual(efforts);
+      expect(mapRoutedResponsesReasoningEffort({ model, reasoning: { effort: "minimal" } }, route.provider, model))
+        .toEqual({ model, reasoning: { effort: "minimal" } });
+    });
+  }
+}
 
 const MUSE_MODEL = "muse-spark-1.2-contributor";
 const MUSE_13_MODEL = "muse-spark-1.3-contributor";

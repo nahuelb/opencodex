@@ -191,10 +191,11 @@ describe("Astra adapter integration", () => {
     expect(JSON.parse(request.body).input.filter((i: any) => i.type === "configuration_update")).toEqual([update("low")]);
     expect(request.reasoningLog?.effectiveEffort).toBe("low");
   });
-  test("other native models do not activate effort state or diagnostics", () => {
+  test("other native models log wire effort without activating Astra state or diagnostics", () => {
     const request = adapterRequest(first, "low", { model: "gpt-5.6-luna" });
     expect(JSON.parse(request.body).reasoning.effort).toBe("low");
-    expect(request.reasoningLog).toBeUndefined();
+    expect(request.reasoningLog).toEqual({ effectiveEffort: "low", wireField: "reasoning.effort", wireValue: "low" });
+    expect(request.astraEffortCache).toBeUndefined();
     expect(readdirSync(directory)).toEqual([]);
   });
   test("parser, native adapter, websocket framing and logs preserve the update", () => {

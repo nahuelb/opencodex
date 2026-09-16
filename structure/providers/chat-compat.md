@@ -339,3 +339,5 @@ prose the model reads beside them. Vendor tool execution stays disabled on both
 adapters, and Qoder's explicit refusal of original images is unchanged.
 
 Canonical Responses identity sanitation and narrowly scoped pre-output combo recovery follow [request-local target compatibility](../runtime.md#request-local-target-compatibility); other adapter contracts remain unchanged.
+
+Zen Muse Responses uses the [exact Muse ladder](../catalog.md#opencode-muse-effort-ladders) and [passthrough effort metadata](../transports/responses.md#passthrough-effort-logging), separate from Chat wire fields.

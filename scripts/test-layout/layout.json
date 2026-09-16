@@ -1184,6 +1184,7 @@
     "responses-pool-401-refresh.test.ts": "responses",
     "responses-pool-refresh-attribution.test.ts": "responses",
     "responses-reasoning-effort-downgrade.test.ts": "responses",
+    "responses-reasoning-log.test.ts": "responses",
     "responses-reasoning-summary-passthrough.test.ts": "responses",
     "responses-routed-web-search-fields.test.ts": "responses",
     "responses-self-named-namespace-scrub.test.ts": "responses",

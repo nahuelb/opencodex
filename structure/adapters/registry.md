@@ -191,3 +191,5 @@ wire defaults. Zen and Free presets identify as `opencodex` and share the
 Client session headers and Claude metadata supply identity; shared prompt cohorts never
 substitute for a conversation. Zen omits the header without a real conversation, while Go
 falls back to the request-scoped lane it needs on every request.
+
+Muse reasoning metadata follows the [exact catalog ladder](../catalog.md#opencode-muse-effort-ladders); its selected Responses adapter publishes [wire-effort metadata](../transports/responses.md#passthrough-effort-logging) before dispatch.

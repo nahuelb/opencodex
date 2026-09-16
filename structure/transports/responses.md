@@ -383,6 +383,18 @@ Arguments, user text, and schema property names are never rewritten.
 
 > Decision record: [ADR-0043](../decisions/ADR-0043-responses-http-sse.md)
 
+### Passthrough effort logging
+
+`src/adapters/openai-responses/passthrough.ts` derives `reasoningLog` from the final outbound
+`reasoning.effort`, after mapping and stripping. Missing or stripped efforts produce no wire
+metadata. Astra preservation retains its separate effective effort and baseline wire value.
+`recordAdapterReasoning` in `src/server/request-log.ts` copies the bounded, redacted fields
+to the active attempt and logical row before each send. Rebuilds replace those fields through
+the existing recorder; no prompt content is copied into this metadata.
+`tests/responses/responses-reasoning-log.test.ts` drives Zen Responses through fixture upstream responses and
+checks JSON/SSE persistence, mapping, omission, attempt fields, and prompt exclusion.
+Muse's accepted values follow the [catalog contract](../catalog.md#opencode-muse-effort-ladders).
+
 ### Passthrough SSE stream shapes (#314)
 
 Native passthrough SSE has TWO shapes, selected per request in

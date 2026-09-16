@@ -508,6 +508,12 @@ their existing routes. The `opencode-zen` and `opencode-free` presets identify t
 The value stays stable across turns and differs between conversations and sibling subagents.
 An explicit provider session header takes precedence.
 
+These Muse models offer exactly `minimal`, `low`, `medium`, `high`, and `xhigh` in the Codex
+picker on `opencode-zen` and `opencode-free`. Go's Muse 1.3/1.2 contributor models use the
+same ladder. OpenCodex sends each supported label unchanged as `reasoning.effort`; it does
+not add `max` or `ultra` picker options for these models. Older requests with those values
+map to `xhigh`. No default override is added; the picker still defaults to `medium`.
+
 Clients must send a stable session identity, such as `thread-id`, `session-id`, or
 `x-opencode-session`; Claude Code can supply it through `metadata.user_id`. Without one,
 OpenCodex leaves the session header absent. Zen can then return `MissingSessionID` with

@@ -382,3 +382,5 @@ Exact [model input declarations](../config.md#explicit-per-model-capability-decl
 Provider-scoped approval reviewer settings are projected by the [catalog owner](../catalog.md#provider-scoped-approval-reviewer); this surface retains its existing routing, transport and account-selection behavior.
 
 Renamed fixed-key providers receive [missing reasoning metadata](../catalog.md#renamed-destination-reasoning-metadata) during derivation; explicit per-model entries and provider defaults retain precedence.
+
+The provider guide documents [OpenCode Muse effort ladders](../catalog.md#opencode-muse-effort-ladders), and the management reference documents [Responses effort logging](../transports/responses.md#passthrough-effort-logging).

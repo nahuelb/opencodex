@@ -246,6 +246,14 @@ final provider. Custom destinations and historic rows omit the field; consumers 
 infer subscription usage from the current configuration, model name, or inbound API key.
 The log reports usage, not subscription invoice amounts.
 
+Responses passthrough records `requestedEffort`, `effectiveEffort`, `reasoningWireField`, and
+`reasoningWireValue` on the request and each attempt in `usage.jsonl`. For Zen Muse at `xhigh`,
+the effective effort and wire value are `xhigh`, and the field is `reasoning.effort`. Wire
+metadata reflects the final mapped request; absent or stripped effort fields stay absent.
+Astra cache preservation can retain a baseline wire value while applying a different effective
+effort through configuration updates. These fields contain no prompt content. Historic rows
+with missing fields remain unknown.
+
 `GET /api/usage` reads `~/.opencodex/usage.jsonl` from the beginning through the current ledger
 snapshot on a cold start. It processes fixed 1 MiB chunks and retains compact aggregate state rather
 than every normalized request row. Later refreshes validate the previous line boundary and fold only

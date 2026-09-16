@@ -567,3 +567,5 @@ Two call sites need the rule — the live path in `reevaluateAffinityQuota` and 
 `previewReusableAffinityAccount` that subagent fallback reads — and they share one helper rather
 than restating it, because the suite asserts the two answer identically and a preview that
 disagreed would hand fallback a different account than the request actually uses.
+
+Generic Responses [wire-effort logging](../transports/responses.md#passthrough-effort-logging) preserves Astra cache metadata precedence: effective effort can differ from the baseline wire value.

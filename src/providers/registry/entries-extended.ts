@@ -53,6 +53,8 @@ import {
   OPENCODE_ZEN_IMAGE_MODELS,
   OPENCODE_ZEN_MUSE_MODELS,
   META_MUSE_CONTEXT_WINDOW,
+  META_MUSE_REASONING_EFFORTS,
+  META_MUSE_REASONING_EFFORT_MAP,
   deepseekThinkingEffortsFor,
   deepseekReasoningMapFor,
   ALIBABA_TOKEN_PLAN_MODELS,
@@ -906,12 +908,14 @@ export const PROVIDER_REGISTRY_EXTENDED: readonly ProviderRegistryEntry[] = [
     // reasoning + thinking metadata so `opencode-zen/deepseek-v4-flash-free` — and the other
     // Zen DeepSeek thinking models — never serialize a bare tool-call turn.
     note: "Keyed OpenCode Zen gateway. Free models on this tier are often short-window rate-limited at roughly 15-20 requests/minute (community-measured; OpenCode does not publish RPM). Zen may return generic 429s without Retry-After / X-RateLimit headers; when Retry-After is omitted, opencodex adds a synthetic backoff hint (upstream Retry-After still wins). Distinct from the keyless opencode-free desktop quota (~200 Big Pickle/free-model requests per 5 hours). Docs: https://opencode.ai/docs/zen/. Free-model prompts may be retained for training — do not send confidential material.",
-    modelReasoningEfforts: Object.fromEntries(
-      [...DEEPSEEK_GATEWAY_THINKING_MODELS, ...OPENCODE_FREE_DEEPSEEK_MODELS].map(id => [id, deepseekThinkingEffortsFor(id)]),
-    ),
-    modelReasoningEffortMap: Object.fromEntries(
-      [...DEEPSEEK_GATEWAY_THINKING_MODELS, ...OPENCODE_FREE_DEEPSEEK_MODELS].map(id => [id, deepseekReasoningMapFor(id)]),
-    ),
+    modelReasoningEfforts: {
+      ...Object.fromEntries([...DEEPSEEK_GATEWAY_THINKING_MODELS, ...OPENCODE_FREE_DEEPSEEK_MODELS].map(id => [id, deepseekThinkingEffortsFor(id)])),
+      ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, META_MUSE_REASONING_EFFORTS])),
+    },
+    modelReasoningEffortMap: {
+      ...Object.fromEntries([...DEEPSEEK_GATEWAY_THINKING_MODELS, ...OPENCODE_FREE_DEEPSEEK_MODELS].map(id => [id, deepseekReasoningMapFor(id)])),
+      ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, META_MUSE_REASONING_EFFORT_MAP])),
+    },
     preserveReasoningContentModels: [...DEEPSEEK_GATEWAY_THINKING_MODELS, ...OPENCODE_FREE_DEEPSEEK_MODELS],
     // Same Zen gateway as opencode-free: the DeepSeek vision preview id
     // (merges into deepseek-v4-flash later).
@@ -945,8 +949,14 @@ export const PROVIDER_REGISTRY_EXTENDED: readonly ProviderRegistryEntry[] = [
     note: "Key-optional OpenCode Zen free models. OpenCodex identifies itself and derives x-opencode-session from a stable conversation ID. Requests without session identity can receive MissingSessionID; adding a key alone does not supply it. Upstream availability and account restrictions still apply. OpenCode advertises about 200 Big Pickle/free-model requests per 5 hours; short-window limits can be roughly 15-20 requests/minute. When Retry-After is absent, OpenCodex adds a backoff hint. Use opencode-zen for a Zen API key. Free-model prompts may be retained for training. Docs: https://opencode.ai/docs/zen/.",
     dashboardUrl: "https://opencode.ai",
     staticHeaders: { "User-Agent": "opencodex" },
-    modelReasoningEfforts: Object.fromEntries(OPENCODE_FREE_DEEPSEEK_MODELS.map(id => [id, deepseekThinkingEffortsFor(id)])),
-    modelReasoningEffortMap: Object.fromEntries(OPENCODE_FREE_DEEPSEEK_MODELS.map(id => [id, deepseekReasoningMapFor(id)])),
+    modelReasoningEfforts: {
+      ...Object.fromEntries(OPENCODE_FREE_DEEPSEEK_MODELS.map(id => [id, deepseekThinkingEffortsFor(id)])),
+      ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, META_MUSE_REASONING_EFFORTS])),
+    },
+    modelReasoningEffortMap: {
+      ...Object.fromEntries(OPENCODE_FREE_DEEPSEEK_MODELS.map(id => [id, deepseekReasoningMapFor(id)])),
+      ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, META_MUSE_REASONING_EFFORT_MAP])),
+    },
     preserveReasoningContentModels: OPENCODE_FREE_DEEPSEEK_MODELS,
     // The DeepSeek vision preview id is preemptive metadata for when Zen starts
     // serving it (merges into v4-flash later).

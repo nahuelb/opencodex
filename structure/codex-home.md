@@ -275,3 +275,5 @@ Pool quota producers and account commands follow the [bounded raw-observation co
 The account history response can include a [low-confidence effective capacity estimate](providers/openai-tiers.md#observed-effective-token-capacity); usage normalization retains local-answer provenance so local responses cannot supply samples.
 
 Codex pool settings and their consumers follow the [reset-first ordering contract](providers/openai-tiers.md#reset-first-account-ordering), including independent-quota fallback and preserved affinity.
+
+Catalog publication preserves the [OpenCode Muse effort ladder](catalog.md#opencode-muse-effort-ladders), including disk-preserved rows, without appending synthetic tiers.
