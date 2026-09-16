@@ -16,8 +16,7 @@ it does not prohibit integration commits on this fork's `main`.
 
 ### Branches and contribution boundaries
 
-- In the current checkout, `origin` is upstream and `contribution` is our fork.
-  Verify remote URLs, branch, working-tree state, and `git worktree list` before mutation.
+- Verify remote URLs, branch, working-tree state, and `git worktree list` before mutation.
   A remote named `origin` is not necessarily the destination for our changes.
 - Keep feature implementations independently reviewable. Develop and validate each
   feature on its PR branch, then carry the reviewed changes into fork `main`.
@@ -43,8 +42,8 @@ it does not prohibit integration commits on this fork's `main`.
 
 Astra preservation is automatic for supported canonical ChatGPT Codex requests;
 there is no enable/disable setting. Side-chat reuse uses the existing
-`providers.openai.experimentalCodexSideChatCache` setting. It is enabled in our
-local daily-driver configuration, while the upstream feature defaults to off.
+`providers.openai.experimentalCodexSideChatCache` setting, which defaults to off
+upstream.
 
 The fork also carries the legacy-home `owned-state` fallback in
 [src/adapters/astra-effort-state.ts](src/adapters/astra-effort-state.ts), combined
@@ -61,8 +60,7 @@ Both features record diagnostics in the existing `$OPENCODEX_HOME/usage.jsonl`
 An optional second argument selects an exact request ID in that recent window.
 [scripts/astra-effort-cache-report.ts](scripts/astra-effort-cache-report.ts) and
 [scripts/side-chat-cache-report.ts](scripts/side-chat-cache-report.ts) provide separate
-summaries. The personal `~/.codex/skills/codex-cache-check/SKILL.md` and its read-only
-helper check one message/request, including available diagnostics for both features.
+summaries.
 
 A local reuse decision or stored snapshot is not proof of an upstream cache hit.
 Use reported cached-input tokens; keep absent or estimated usage unknown. Preserve
@@ -70,59 +68,6 @@ exact child/request identity, per-attempt metadata, and completion-before-termin
 logging. Do not sum nested phase timings or token totals across both feature groups.
 Synthetic benchmarks measure local costs, not real model cache savings. Cache checks
 must not issue model requests just to warm or probe the cache.
-
-### Local checkout, automation, and safe refresh
-
-These paths describe the maintainer's machine, not dependencies for other clones.
-Read `~/.agents/AGENTS.md` when present. The combined daily-driver checkout and the
-app's saved project are `~/Projects/opencodex`, with `main` checked out there.
-`~/Projects/opencodex-cache-local` is retained as a detached historical checkout.
-Git permits a branch in only one worktree: keep `main` in the saved project and use
-separate feature branches in other worktrees. Verify the actual worktree before editing.
-
-The active Codex schedule **Update OpenCodex fork and local service** runs daily at
-**06:00 America/Argentina/Buenos_Aires**, using **gpt-6-astra / low**. Its ID is
-`update-opencodex-fork-and-local-service`. It incorporates fork `main`, merges upstream
-`main`, validates the integration, pushes our fork, and refreshes the installation.
-Inspect its current configuration and memory under `${CODEX_HOME:-$HOME/.codex}/automations/`
-before changing scheduling or starting overlapping maintenance. Preserve dirty work;
-do not create a duplicate schedule or reset a checkout another task is using.
-
-**Never manually stop the proxy and rely on the next assistant step to restart it.**
-The proxy can carry this conversation, so stopping it can interrupt the agent itself.
-Use the independent updater in `~/Projects/Codex/tools/opencodex-refresh/`; read its
-`README.md` first. The normal published-package updater can replace our fork features.
-
-```sh
-python3 "$HOME/Projects/Codex/tools/opencodex-refresh/refresh.py" prepare \
-  --repo "$HOME/Projects/opencodex" --ref main
-```
-
-Preparation builds a committed revision while the old service stays online. Apply the
-exact returned plan with `refresh.py apply <plan>`, then inspect `refresh.py status <plan>`.
-The detached launchd worker owns stop, swap, restart retries, stable-health verification,
-and rollback. A queued job is not success. After an interruption, inspect that job's
-result before starting another update. Verify the installed commit and managed process,
-not just the version number or a successful `/healthz` response. Keep normal user data
-homes, credentials, and private rollback artifacts intact. Documentation-only edits do
-not need an immediate service refresh.
-
-### Test-runtime caveat
-
-As of 2026-09-11, bundled Bun 1.4.2 has a test-isolation crash reproduced on clean
-upstream code. The local verified test-only runtime is documented in
-`~/Projects/Codex/tools/opencodex-test-runtime/README.md`:
-
-```sh
-python3 "$HOME/Projects/Codex/tools/opencodex-test-runtime/test.py" "$PWD" --changed=dev
-```
-
-It invokes the repository test wrapper directly with a checksum-verified Bun canary.
-It preserves test isolation and failure propagation; it does not change the production
-runtime. Recheck the pinned version and current workaround before use. `bun run test`
-can select the pinned dependency again through package-script PATH handling. Report
-which runtime passed; do not call pinned-runtime prepush green on that evidence.
-Use isolated tests that cannot rewrite the real service's launch configuration.
 
 ## What this project is
 
