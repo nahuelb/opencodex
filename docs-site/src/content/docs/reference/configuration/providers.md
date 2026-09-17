@@ -1118,7 +1118,7 @@ configuration row, then restart the proxy. The default is disabled. Set it to
 This option applies only to the canonical ChatGPT forward Responses provider.
 
 With this option enabled, the proxy observes completed streamed requests and
-keeps bounded fingerprints for up to 64 tasks, with a ten-minute lifetime and a
+keeps bounded fingerprints and extracted method references for up to 64 tasks, with a ten-minute lifetime and a
 2,048-input-item limit. It uses explicit Desktop fork metadata to match a side
 chat to its parent. The selected credential, account, model, settings, tools,
 and inherited prompt prefix must be compatible before the proxy reuses the
@@ -1136,8 +1136,21 @@ Unknown or malformed stream options still require an exact match.
 The proxy recognizes exact Desktop side-conversation rule and boundary text.
 It moves recognized rules to a developer message at the side boundary, or adds
 a developer copy of the recognized boundary when no separate rule block exists.
-It also moves a small allowlist of context-dependent `functions.exec` method
-references to a final developer message containing that request's own methods.
+It extracts a small allowlist of context-dependent `functions.exec` method
+references into developer messages. Completed requests retain those messages at
+their original positions across tool calls and later user turns. Side chats inherit
+only references within their verified parent prefix. Multiple method replacements at
+the same inherited position skip parent reuse because the fork history is ambiguous.
+A changed method list appends
+one replacement message; an empty recognized list explicitly replaces earlier lists.
+Unknown executor formats keep their original description and do not replay extracted references.
+
+Extracted text stays in process memory, with at most 32 references and 512 KiB of
+serialized UTF-8 reference data per snapshot. Bound children can retain an older
+parent snapshot in addition to current task snapshots. Exceeding either reference
+limit forwards the original request; successful completion retires that task's old
+reference history. Failed or unfinished requests do not commit reference history,
+so continuity across output replayed from those requests is not guaranteed.
 Executable tool schemas remain intact. An explicitly bounded inherited history
 may reuse its proven prefix before a differing reasoning item; the child's
 reasoning and subsequent messages remain unchanged.

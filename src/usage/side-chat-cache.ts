@@ -2,7 +2,7 @@ export const SIDE_CHAT_CACHE_REASONS = [
   "ineligible", "incompatible-prefix", "missing-parent", "account-or-header-change", "settings-change",
   "multiple-rule-blocks", "instructions-change", "ambiguous-boundary", "empty-inherited-prefix",
   "input-prefix-change", "inherited-with-tail-rules", "inherited-with-developer-boundary",
-  "inherited-exact-prefix", "parent-observed", "error",
+  "inherited-exact-prefix", "parent-observed", "exec-reference-history-limit", "ambiguous-reference-history", "error",
 ] as const;
 
 export interface SideChatCacheMetrics {

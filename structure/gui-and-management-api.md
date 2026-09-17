@@ -1,5 +1,7 @@
 # GUI And Management API
 
+Side-chat retention diagnostics follow the [tool-reference history contract](runtime.md#desktop-tool-reference-history).
+
 The shared server request path follows the Responses
 [core module ownership](transports/responses.md#core-module-ownership). This surface retains its existing behavior.
 

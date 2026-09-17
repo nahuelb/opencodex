@@ -1,5 +1,7 @@
 # Subagents And Multi-Agent Surface
 
+Side-task prefix inheritance follows the [tool-reference history contract](runtime.md#desktop-tool-reference-history).
+
 Encrypted-task and fallback request handling follow the Responses
 [core module ownership](transports/responses.md#core-module-ownership). This surface retains its existing behavior.
 

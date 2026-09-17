@@ -1,5 +1,7 @@
 # Codex Home
 
+Process-local side-chat state follows the [tool-reference history contract](runtime.md#desktop-tool-reference-history).
+
 ## Codex home
 
 `src/codex/paths.ts` resolves Codex state from `CODEX_HOME` when set and valid, otherwise from

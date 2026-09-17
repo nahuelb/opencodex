@@ -5,6 +5,7 @@ import { createResponsesPassthroughAdapter } from "../../src/adapters/openai-res
 import { codexWsReuseIdentity } from "../../src/server/responses/codex-ws-pool";
 import { withTestTranslatorBudget } from "../helpers/translator-budget";
 import { splitExecCacheReference } from "../../src/codex/exec-cache-reference";
+import { normalizeSideChatCacheMetrics } from "../../src/usage/side-chat-cache";
 
 const message = (role: string, text: string) => ({ type: "message", role, content: [{ type: "input_text", text }] });
 const history = [message("developer", "Parent developer rules"), message("user", "Parent question")];
@@ -29,6 +30,171 @@ const execDescription = (sideChat: boolean) => "Run JavaScript code to orchestra
 const execCatalog = (description: string) => ({ type: "additional_tools", role: "developer", tools: [{ type: "namespace", name: "functions", tools: [{ type: "custom", name: "exec", description, format: { type: "grammar", syntax: "lark", definition: "start: /.+/" } }] }] });
 
 describe("side-chat cache lineage", () => {
+  test("preserves the complete parent wire prefix across tool rounds and user turns", () => {
+    const cache = new SideChatCache();
+    const input: unknown[] = [execCatalog(execDescription(false)), ...history];
+    let previous: unknown[] = [];
+    for (let step = 0; step < 5; step++) {
+      if (step) input.push(
+        { type: "custom_tool_call", name: "exec", call_id: `call_${step}`, input: "text(1)" },
+        { type: "custom_tool_call_output", call_id: `call_${step}`, output: [{ type: "input_text", text: "1" }] },
+      );
+      if (step === 3) input.push(message("user", "Continue with the next part"));
+      const request = body("parent", structuredClone(input) as never);
+      const before = structuredClone(request);
+      const result = cache.prepare(request, headers());
+      const wire = result.body.input as unknown[];
+      expect(wire.slice(0, previous.length)).toEqual(previous);
+      expect(request).toEqual(before);
+      expect(wire.length).toBe(input.length + 1);
+      result.complete();
+      previous = wire;
+    }
+  });
+  test("retains parent reference positions in a child and preserves child tool continuations", () => {
+    const cache = new SideChatCache();
+    const parentInput = [execCatalog(execDescription(false)), ...history];
+    const parent = cache.prepare(body("parent", parentInput as never), headers());
+    parent.complete();
+    const childInput = [execCatalog(execDescription(true)), ...history, message("assistant", "Parent answer"), boundary, message("user", "Child question")];
+    const child = cache.prepare(body("child", childInput as never), headers("child", "parent"));
+    const childWire = child.body.input as unknown[];
+    expect(childWire.slice(0, (parent.body.input as unknown[]).length)).toEqual(parent.body.input as unknown[]);
+    expect(JSON.stringify(childWire.at(-1))).toContain("fire_confetti");
+    child.complete();
+    const continued = cache.prepare(body("child", [...childInput,
+      { type: "custom_tool_call", name: "exec", call_id: "child_call", input: "text(1)" },
+      { type: "custom_tool_call_output", call_id: "child_call", output: [{ type: "input_text", text: "1" }] },
+    ] as never), headers("child", "parent"));
+    expect((continued.body.input as unknown[]).slice(0, childWire.length)).toEqual(childWire);
+  });
+  test("appends replacement method lists once, including a recognized empty list", () => {
+    const cache = new SideChatCache();
+    const stable = splitExecCacheReference(execDescription(false))!.stable;
+    const suffix: unknown[] = [...history];
+    let previous: unknown[] = [];
+    for (const [step, description] of [execDescription(false), execDescription(true), stable, stable].entries()) {
+      const input = [execCatalog(description), ...suffix];
+      const result = cache.prepare(body("parent", input as never), headers());
+      const wire = result.body.input as unknown[];
+      expect(wire.slice(0, previous.length)).toEqual(previous);
+      expect(wire.length - input.length).toBe(Math.min(step + 1, 3));
+      if (step < 3) expect(JSON.stringify(wire.at(-1))).toContain("replaces all earlier");
+      if (step === 2) expect(JSON.stringify(wire.at(-1))).toContain("list of additional functions.exec methods is empty");
+      result.complete();
+      previous = wire;
+      suffix.push(message("assistant", `Answer ${step}`));
+    }
+  });
+  test("unsupported descriptions retire extracted history without inventing an empty list", () => {
+    const cache = new SideChatCache();
+    const initial = [execCatalog(execDescription(false)), ...history];
+    cache.prepare(body("parent", initial as never), headers()).complete();
+    const malformed = body("parent", [execCatalog("Unknown executor format"), ...history] as never);
+    const skipped = cache.prepare(malformed, headers());
+    expect(skipped.body).toEqual(malformed);
+    expect(JSON.stringify(skipped.body)).not.toContain("list of additional");
+    skipped.complete();
+    const restored = cache.prepare(body("parent", [...initial, message("assistant", "Answer")] as never), headers());
+    expect((restored.body.input as unknown[]).length).toBe(initial.length + 2);
+    expect((restored.body.input as unknown[])[initial.length]).toEqual(message("assistant", "Answer"));
+  });
+  test("changed instructions and lineage cannot replay an earlier task reference", () => {
+    for (const change of ["instructions", "lineage", "account"]) {
+      const cache = new SideChatCache();
+      const input = [execCatalog(execDescription(false)), ...history];
+      cache.prepare(body("parent", input as never), headers()).complete();
+      const request = body("parent", [...input, message("assistant", "Answer")] as never);
+      if (change === "instructions") request.instructions = "New base instructions";
+      const incoming = headers("parent", change === "lineage" ? "different-parent" : undefined);
+      if (change === "account") incoming["chatgpt-account-id"] = "other-fixture-account";
+      const result = cache.prepare(request, incoming);
+      expect((result.body.input as unknown[])[input.length]).toEqual(message("assistant", "Answer"));
+      expect((result.body.input as unknown[]).length).toBe(request.input.length + 1);
+    }
+  });
+  test("a divergent reasoning suffix excludes later parent method replacements", () => {
+    const cache = new SideChatCache();
+    const initial = [execCatalog(execDescription(false)), ...history];
+    const first = cache.prepare(body("parent", initial as never), headers());
+    first.complete();
+    const later = [execCatalog(execDescription(true)), ...history, { type: "reasoning", encrypted_content: "fixture-parent" }, message("assistant", "Later answer")];
+    cache.prepare(body("parent", later as never), headers()).complete();
+    const child = cache.prepare(body("child", [execCatalog(execDescription(false)), ...history,
+      { type: "reasoning", encrypted_content: "fixture-child" }, boundary, message("user", "Question"),
+    ] as never), headers("child", "parent"));
+    expect(child.reason).toBe("inherited-with-developer-boundary");
+    expect((child.body.input as unknown[]).slice(0, 4)).toEqual(first.body.input as unknown[]);
+    expect(JSON.stringify(child.body.input)).not.toContain("fire_confetti");
+  });
+  test("retained references are isolated from caller and returned object mutations", () => {
+    const cache = new SideChatCache();
+    const input = [execCatalog(execDescription(false)), ...history];
+    const result = cache.prepare(body("parent", input as never), headers());
+    const expected = structuredClone(result.body.input as unknown[]);
+    (result.body.input as unknown[])[3] = message("developer", "Replaced reference");
+    input[0] = execCatalog("Changed by caller");
+    result.complete();
+    const next = cache.prepare(body("parent", [execCatalog(execDescription(false)), ...history, message("assistant", "Answer")] as never), headers());
+    expect((next.body.input as unknown[]).slice(0, expected.length)).toEqual(expected);
+    const reference = (next.body.input as ReturnType<typeof message>[])[3]!;
+    reference.content[0]!.text = "Nested mutation";
+    next.complete();
+    const last = cache.prepare(body("parent", [execCatalog(execDescription(false)), ...history, message("assistant", "Answer")] as never), headers());
+    expect((last.body.input as unknown[]).slice(0, expected.length)).toEqual(expected);
+    expect(JSON.stringify(last.metrics)).not.toContain("create_goal");
+  });
+  test("reference count overflow restores the original request and supersedes stale completions", () => {
+    const cache = new SideChatCache(Date.now, 2);
+    const suffix: unknown[] = [...history];
+    const description = (index: number) => execDescription(false).replace("### `create_goal`\nMethod contract", `### \`create_goal\`\nRevision ${index}`);
+    for (let index = 0; index < 32; index++) {
+      const result = cache.prepare(body("parent", [execCatalog(description(index)), ...suffix] as never), headers());
+      expect(result.reason).toBe("parent-observed");
+      result.complete();
+      suffix.push(message("assistant", `Answer ${index}`));
+    }
+    const stale = cache.prepare(body("parent", [execCatalog(description(31)), ...suffix] as never), headers());
+    const request = body("parent", [execCatalog(description(32)), ...suffix] as never);
+    const incoming = headers();
+    const fallback = cache.prepare(request, incoming);
+    expect(fallback.reason).toBe("exec-reference-history-limit");
+    expect(normalizeSideChatCacheMetrics(fallback.metrics)?.reason).toBe("exec-reference-history-limit");
+    expect(fallback.body).toBe(request);
+    expect(fallback.headers).toBe(incoming);
+    expect(fallback.complete()).toBe("stored");
+    cache.prepare(body("unrelated-one"), headers("unrelated-one")).complete();
+    cache.prepare(body("unrelated-two"), headers("unrelated-two")).complete();
+    expect(stale.complete()).toBe("superseded");
+    const next = cache.prepare(request, incoming);
+    expect(next.reason).toBe("parent-observed");
+    expect((next.body.input as unknown[]).length).toBe(request.input.length + 1);
+  });
+  test("forks decline ambiguous method replacements at the same base position", () => {
+    const cache = new SideChatCache();
+    for (const description of [execDescription(false), execDescription(true)]) {
+      cache.prepare(body("parent", [execCatalog(description), ...history] as never), headers()).complete();
+    }
+    const child = cache.prepare(body("child", [execCatalog(execDescription(true)), ...history,
+      message("assistant", "Answer from the first parent response"), boundary, message("user", "Question"),
+    ] as never), headers("child", "parent"));
+    expect(child.reason).toBe("ambiguous-reference-history");
+    expect(child.body.prompt_cache_key).toBe("child");
+    expect(JSON.stringify(child.body.input)).not.toContain("create_goal");
+    expect(normalizeSideChatCacheMetrics(child.metrics)?.reason).toBe("ambiguous-reference-history");
+  });
+  test("reference retention uses UTF-8 byte bounds and accounts for retained text", () => {
+    const cache = new SideChatCache();
+    const large = execDescription(false).replace("### `create_goal`\nMethod contract", "### `create_goal`\n" + "界".repeat(95_000));
+    const first = cache.prepare(body("parent", [execCatalog(large), ...history] as never), headers());
+    expect(first.reason).toBe("parent-observed");
+    first.complete();
+    expect(first.metrics.estimatedRetainedBytes).toBeGreaterThan(285_000);
+    const request = body("parent", [execCatalog(large.replace("界", "字")), ...history, message("assistant", "Answer")] as never);
+    const result = cache.prepare(request, headers());
+    expect(result.reason).toBe("exec-reference-history-limit");
+    expect(result.body).toBe(request);
+  });
   test("splits only known Desktop context methods, including an emptied namespace", () => {
     const parent = splitExecCacheReference(execDescription(false))!;
     const child = splitExecCacheReference(execDescription(true))!;
@@ -53,7 +219,7 @@ describe("side-chat cache lineage", () => {
     const parentInput = first.body.input as unknown[];
     const childInput = result.body.input as unknown[];
     expect(childInput.slice(0, 3)).toEqual(parentInput.slice(0, -1));
-    expect(childInput[4]).toEqual(message("developer", SIDE_CHAT_BOUNDARY));
+    expect(childInput[5]).toEqual(message("developer", SIDE_CHAT_BOUNDARY));
     expect(JSON.stringify(childInput.at(-1))).toContain("fire_confetti");
     expect(JSON.stringify(childInput.at(-1))).not.toContain("create_goal");
     expect(parent).toEqual(beforeParent); expect(child).toEqual(beforeChild);

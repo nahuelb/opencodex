@@ -15,6 +15,32 @@ it requires no runtime lifecycle change or new configuration option.
 
 Shared parsing and streaming follow the [request-copy](transports/byte-accounting.md#request-copy-accounting) and [stream-buffer accounting](transports/byte-accounting.md#stream-buffer-accounting) contracts.
 
+## Desktop tool-reference history
+
+`src/codex/side-chat-cache.ts` keeps extracted method references at their original
+positions in compatible completed request history. `src/codex/exec-cache-reference.ts`
+extracts only recognized Desktop context methods. Changed method lists append one
+replacement reference; a recognized empty list explicitly replaces earlier lists.
+Unsupported executor formats do not replay extracted references.
+
+Reference positions count base input items before injection. Parent inheritance includes
+only references whose complete preceding base prefix matches. Multiple replacement
+lists at one inherited position make the fork ambiguous and decline parent reuse. Own-history reuse also
+requires matching scope, settings, instructions, and fork lineage. Snapshots and returned
+messages own separate copies of reference text.
+
+Each snapshot retains at most 32 references and 512 KiB of serialized UTF-8 reference data
+in process memory. Reference text is included in retained-byte accounting and excluded
+from diagnostics. The existing 64-entry snapshot and binding maps and ten-minute expiry
+bound retained state; bindings can retain distinct snapshots. Overflow restores the
+original body and headers. A completed fallback stores a snapshot without extracted
+references and supersedes older pending completions. Bounded completion state prevents
+older decisions from restoring history after snapshot eviction or cache clearing. Failed or unfinished responses do
+not commit history, so continuity across their replayed output is not guaranteed.
+
+`tests/codex-integration/codex-side-chat-cache.test.ts` checks complete input-prefix
+continuity, replacement lists, fork boundaries, limits, and mutation isolation.
+
 ## CLI readiness diagnostics
 
 Catalog-derived reasoning-level diagnostics are escaped only at the human-output boundary, which `src/cli/runtime-api.ts` owns alongside the human/JSON print split. Every CLI path that prints a hub-supplied catalog value renders it there: the first-time refusal in `src/cli/connect.ts` and the connected `ocx sync` refusal in `src/cli/dispatch.ts`. C0/C1 controls, DEL, and Unicode line/paragraph separators print as visible hexadecimal escapes; structured status retains the exact reason, and a rendered failure keeps the domain error as its `cause`. The ready/unverified/incompatible classification and exit policy are unchanged.

@@ -1,5 +1,7 @@
 # Model Catalog
 
+Desktop tool-description extraction follows the [tool-reference history contract](runtime.md#desktop-tool-reference-history).
+
 Catalog discovery remains separate from the Responses final-route
 [core module ownership](transports/responses.md#core-module-ownership). This surface retains its existing behavior.
 

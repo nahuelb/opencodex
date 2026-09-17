@@ -1,5 +1,7 @@
 # Config Surface
 
+The experimental side-chat option uses the bounded [tool-reference history contract](runtime.md#desktop-tool-reference-history).
+
 The configuration-only [plaintext V2 contract](subagents.md#plaintext-v2-agent-messages)
 is scoped to canonical ChatGPT Responses forwarding; other source-area behavior described here is unchanged.
 
