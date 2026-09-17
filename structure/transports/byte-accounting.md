@@ -44,7 +44,7 @@ Cursor's Muse Spark 1.3 catalog, wire efforts, native image input, and price sou
 
 Responses [effort metadata](responses.md#passthrough-effort-logging) reads only the final effort scalar; it does not serialize or retain another request-body copy.
 
-The [manual compaction override](responses.md#manual-compaction-overrides) changes model and effort scalars on the already parsed request, within the existing body-reader budget.
+The [manual compaction override](responses.md#manual-compaction-overrides) changes model and effort scalars on the already-read request body, before parsing, within the existing body-reader budget.
 
 ## Response-log inspection
 

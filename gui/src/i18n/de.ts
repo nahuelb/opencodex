@@ -695,6 +695,7 @@ export const de: Record<TKey, string> = {
   "models.reasoningEffort.high": "Hoch",
   "models.reasoningEffort.xhigh": "Sehr hoch",
   "models.reasoningEffort.max": "Maximal",
+  "models.reasoningEffort.ultra": "Ultra",
   "models.tipProvider": "Anbieter",
   "models.tipContext": "Kontext",
   "models.tipModalities": "Modalitäten",
