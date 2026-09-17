@@ -148,6 +148,7 @@ Registry consumers preserve the [OpenCode Muse ladder](../catalog.md#opencode-mu
 
 OpenCode Zen Anthropic destinations use the [shared conversation-affinity contract](../transports/inventory.md#opencode-zen-anthropic-affinity).
 
-Routed Grok compaction uses the existing adapter and summary contract after any
-[manual compaction model override](../transports/responses.md#manual-compaction-overrides).
+Routed Grok compaction uses the existing adapter and summary contract after a same-provider
+[manual compaction model override](../transports/responses.md#manual-compaction-overrides); a
+cross-provider override runs the portable summarizer on the selected provider instead.
 Shared response-log retention and native SSE inspection pacing follow the [bounded inspection contract](../transports/byte-accounting.md#response-log-inspection); other subsystem behavior remains unchanged.
