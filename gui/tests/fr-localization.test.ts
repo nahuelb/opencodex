@@ -135,6 +135,7 @@ const INTENTIONAL_ENGLISH = new Set<TKey>([
   "models.reasoningEffort.minimal",
   "models.reasoningEffort.max",
   "models.reasoningEffort.ultra",
+  "logs.cache.label",
   "pws.pacingRpmUnit",
   "claudeDesktop.family.opus",
   "claudeDesktop.family.fable",
