@@ -68,6 +68,26 @@ describe("Anthropic per-message effort history", () => {
     expect(replay.body).toEqual(body(second));
   });
 
+  test("an effort change during a tool continuation lands after the tool_use turn, never before earlier thinking", () => {
+    const toolUse = { role: "assistant", content: [{ type: "thinking", thinking: "t", signature: "abcdefghijklmnopqrstuvwxyz0123456789" }, { type: "tool_use", id: "toolu_1", name: "t", input: {} }] };
+    const toolResult = { role: "user", content: [{ type: "tool_result", tool_use_id: "toolu_1", content: "ok" }] };
+    run(second);
+    const turn = [...second, toolUse, toolResult];
+    const changed = run(turn, "high");
+    expect(changed).toMatchObject({ status: "updated", baseline: "medium", effective: "high" });
+    expect(changed.body.messages).toEqual([...second, toolUse, update("high"), toolResult]);
+    const next = run([...turn, assistant("done"), user("Synthetic third turn")], "high");
+    expect(next.status).toBe("replay");
+    expect(next.body.messages).toEqual([...second, toolUse, update("high"), toolResult, assistant("done"), user("Synthetic third turn")]);
+  });
+
+  test("keeps the wire unchanged when the effort never changes (retry shape)", () => {
+    run(first);
+    const replay = run(second);
+    expect(replay).toMatchObject({ status: "replay", headers: {} });
+    expect(replay.body).toEqual(body(second));
+  });
+
   test("leaves a same-length retry with a different effort alone", () => {
     run(first);
     const retry = run(first, "high");

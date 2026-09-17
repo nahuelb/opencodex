@@ -65,7 +65,18 @@ describe("Anthropic side-chat prefix reuse", () => {
     expect(later).toMatchObject({ reason: "inherited-with-tail-rules", matchedItems: 4 });
     expect(later.metrics).toMatchObject({ phase: "bound-side", expiredEntries: 1 });
     expect(later.body.tools).toEqual([toolA, toolB]);
-    expect(cache.parentToolOrder({ thread: "child", parent: "parent", scope })).toEqual(["alpha", "beta"]);
+    expect(cache.parentToolOrder({ thread: "child", parent: "parent", scope }, [toolB, toolA])).toEqual(["alpha", "beta"]);
+    expect(cache.parentToolOrder({ thread: "child", parent: "parent", scope }, [toolB, { ...toolA, description: "changed" }])).toBeUndefined();
+  });
+
+  test("a bound fork keeps its established shape when its own prefix changes", () => {
+    const cache = new AnthropicSideChatCache();
+    cache.prepare(parentBody, { thread: "parent", scope });
+    expect(cache.prepare(sideBody, { thread: "child", parent: "parent", scope }).reason).toBe("inherited-with-tail-rules");
+    const compacted = cache.prepare({ ...sideBody, messages: [user("summary"), assistant("ok"), user(SIDE_CHAT_BOUNDARY), user("again")] }, { thread: "child", parent: "parent", scope });
+    expect(compacted).toMatchObject({ reason: "inherited-with-tail-rules", metrics: { phase: "bound-side" } });
+    expect(compacted.body.system).toEqual(parentBody.system);
+    expect(compacted.body.messages).toEqual([user("summary"), assistant("ok"), user(SIDE_CHAT_RULES), user(SIDE_CHAT_BOUNDARY), user("again")]);
   });
 
   test("leaves the request alone without a parent snapshot or with a diverged prefix", () => {
@@ -138,5 +149,18 @@ describe("Anthropic adapter side-chat wiring", () => {
     expect(sideBody.messages[5].content[0].text).toBe(SIDE_CHAT_RULES);
     expect(sideBody.messages[6].content[0].text).toBe(SIDE_CHAT_BOUNDARY);
     expect(sideRequest.astraEffortCache).toMatchObject({ status: "replay", updateCount: 1 });
+  });
+
+  test("a fork whose tool schemas differ keeps its own order and reports the change", async () => {
+    const adapter = withTestTranslatorBudget(createAnthropicAdapter(provider));
+    const meta = { headers: new Headers() } as any;
+    await adapter.buildRequest(parsed("Base", parentMessages), meta);
+    const changedTools = [{ ...tools[1], description: "changed" }, tools[0]];
+    const sideMessages = [...parentMessages, { role: "assistant", content: [{ type: "text", text: "two" }] }, { role: "user", content: SIDE_CHAT_BOUNDARY }, { role: "user", content: "q" }];
+    const sideRequest = await adapter.buildRequest(parsed(`Base\n\n${SIDE_CHAT_RULES}`, sideMessages, changedTools, "child-b", "parent"), meta);
+    const sideBody = JSON.parse(sideRequest.body as string);
+    expect(sideRequest.sideChatCache).toMatchObject({ reason: "settings-change" });
+    expect(sideBody.tools.map((t: { name: string }) => t.name)).toEqual(["custom_beta", "custom_alpha"]);
+    expect(sideBody.system[1].text).toContain(SIDE_CHAT_RULES);
   });
 });

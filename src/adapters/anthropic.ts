@@ -951,7 +951,8 @@ export function createAnthropicAdapter(provider: OcxProviderConfig, cacheRetenti
 
       // The tool catalog nudge lists tools in request order, so a fork restores its parent's order first.
       const sideChatIdentity = codexSideChatIdentity(parsed._rawBody, incoming?.headers, `${provider.baseUrl}|${parsed.modelId}`);
-      const parentToolOrder = parsed.context.tools?.length ? parentSideChatToolOrder(sideChatIdentity) : undefined;
+      const initialTools = toolsToAnthropicFormat(parsed, toolNames) as Record<string, unknown>[] | undefined;
+      const parentToolOrder = initialTools?.length ? parentSideChatToolOrder(sideChatIdentity, initialTools) : undefined;
       if (parentToolOrder) {
         const wireName = (tool: { namespace?: string; name: string }) => toolNames.toWire(namespacedToolName(tool.namespace, tool.name));
         const ordered = reorderTools(parsed.context.tools!, parentToolOrder, wireName);

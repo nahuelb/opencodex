@@ -114,11 +114,14 @@ export class AnthropicSideChatCache {
     return parent ? { snapshot: parent, phase: "unbound-side" } : undefined;
   }
 
-  /** Wire tool names in the order this fork already established, else the parent's order. */
-  parentToolOrder(identity: SideChatIdentity): string[] | undefined {
+  /** Wire tool names in the order this fork already established, else the parent's, when the tool set matches by content. */
+  parentToolOrder(identity: SideChatIdentity, wireTools: readonly RecordValue[]): string[] | undefined {
     this.prune();
     const candidate = this.candidate(identity);
     if (!candidate || candidate.snapshot.scope !== identity.scope) return undefined;
+    const hashes = wireTools.map(tool => digest(tool)).sort();
+    const expected = candidate.snapshot.tools.map(tool => tool.hash).sort();
+    if (hashes.length !== expected.length || hashes.some((hash, index) => hash !== expected[index])) return undefined;
     return candidate.snapshot.tools.map(tool => tool.name);
   }
 
@@ -197,7 +200,8 @@ export class AnthropicSideChatCache {
             const prefixLength = boundaries.length ? Math.min(boundaries[0]!, candidate.messages.length) : candidate.messages.length;
             if (prefixLength === 0) result.reason = "empty-inherited-prefix";
             else {
-              const mismatch = candidate.messages.slice(0, prefixLength).findIndex((hash, index) => hash !== digest(messages[index]));
+              const mismatch = selected?.phase === "bound-side" ? -1
+                : candidate.messages.slice(0, prefixLength).findIndex((hash, index) => hash !== digest(messages[index]));
               if (mismatch !== -1) { result.matchedItems = mismatch; result.reason = "input-prefix-change"; }
               else {
                 if (boundaries.length && moved) messages.splice(boundaries[0]!, 0, { role: "user", content: [{ type: "text", text: SIDE_CHAT_RULES }] });
@@ -231,9 +235,9 @@ export class AnthropicSideChatCache {
 
 let runtime: AnthropicSideChatCache | undefined;
 
-export function parentSideChatToolOrder(identity: SideChatIdentity): string[] | undefined {
+export function parentSideChatToolOrder(identity: SideChatIdentity, wireTools: readonly RecordValue[]): string[] | undefined {
   runtime ??= new AnthropicSideChatCache();
-  try { return runtime.parentToolOrder(identity); } catch { return undefined; }
+  try { return runtime.parentToolOrder(identity, wireTools); } catch { return undefined; }
 }
 
 /** Reorder `tools` to `order` (by wire name) when both name sets are equal; otherwise return `tools`. */
