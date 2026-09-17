@@ -63,7 +63,6 @@ import {
   recordAdapterReasoning,
   recordAdapterTier,
   recordAdapterSideChatCache,
-  noteAttemptSend,
   sealRequestAttemptIdentity,
   recordAttemptCredentialSource,
 } from "../request-log";
