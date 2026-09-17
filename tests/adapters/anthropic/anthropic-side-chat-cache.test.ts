@@ -88,6 +88,9 @@ describe("Anthropic side-chat prefix reuse", () => {
     expect(diverged).toMatchObject({ reason: "input-prefix-change", matchedItems: 0, body: { tools: sideBody.tools } });
     const otherTools = cache.prepare({ ...sideBody, tools: [toolA] }, { thread: "child-3", parent: "parent", scope });
     expect(otherTools).toMatchObject({ reason: "settings-change", body: { tools: [toolA] } });
+    expect(otherTools.toolDelta).toEqual({ onlyParent: ["beta"], onlyChild: [], changed: [] });
+    const changedTool = cache.prepare({ ...sideBody, tools: [toolA, { ...toolB, description: "x" }, { name: "gamma", input_schema: {} }] }, { thread: "child-5", parent: "parent", scope });
+    expect(changedTool.toolDelta).toEqual({ onlyParent: [], onlyChild: ["gamma"], changed: ["beta"] });
     const otherScope = cache.prepare(sideBody, { thread: "child-4", parent: "parent", scope: "other" });
     expect(otherScope.reason).toBe("account-or-header-change");
     const untransformed = cache.prepare({ ...sideBody, messages: [...sideBody.messages, assistant("a"), user("b")] }, { thread: "child", parent: "parent", scope });

@@ -6,7 +6,8 @@ import { createHash } from "node:crypto";
 type RecordValue = Record<string, unknown>;
 type Snapshot = { expires: number; scope: string; tools: { name: string; hash: string }[]; system: string; messages: string[] };
 export type SideChatIdentity = { thread?: string; parent?: string; scope: string };
-export type SideChatDecision = { body: RecordValue; reason: SideChatCacheMetrics["reason"]; matchedItems: number; metrics: SideChatCacheMetrics };
+export type ToolDelta = { onlyParent: string[]; onlyChild: string[]; changed: string[] };
+export type SideChatDecision = { body: RecordValue; reason: SideChatCacheMetrics["reason"]; matchedItems: number; metrics: SideChatCacheMetrics; toolDelta?: ToolDelta };
 
 const MAX_TOOLS = 2048;
 const MAX_MESSAGES = 4096;
@@ -190,7 +191,16 @@ export class AnthropicSideChatCache {
         const stripped = stripMessageRules(next.messages as RecordValue[]);
         const moved = system.removed + stripped.removed;
         if (moved > 1) { result.reason = "multiple-rule-blocks"; }
-        else if (!sameSet) { result.reason = "settings-change"; }
+        else if (!sameSet) {
+          result.reason = "settings-change";
+          const parentByName = new Map(candidate.tools.map(tool => [tool.name, tool.hash]));
+          const childByName = new Map(currentTools.map(tool => [tool.name, tool.hash]));
+          result.toolDelta = {
+            onlyParent: candidate.tools.filter(tool => !childByName.has(tool.name)).map(tool => tool.name),
+            onlyChild: currentTools.filter(tool => !parentByName.has(tool.name)).map(tool => tool.name),
+            changed: currentTools.filter(tool => parentByName.has(tool.name) && parentByName.get(tool.name) !== tool.hash).map(tool => tool.name),
+          };
+        }
         else if (digest(system.system) !== candidate.system) { result.reason = "instructions-change"; }
         else {
           const messages = stripped.messages;

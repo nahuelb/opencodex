@@ -1113,7 +1113,8 @@ export function createAnthropicAdapter(provider: OcxProviderConfig, cacheRetenti
       const sideChat = prepareAnthropicSideChatCache(body, sideChatIdentity);
       let wireBody: Record<string, unknown> = sideChat?.body ?? body;
       if (sideChat) {
-        debugProviderDiagnostic("anthropic", "side-chat-cache", { reason: sideChat.reason, matchedItems: sideChat.matchedItems, phase: sideChat.metrics.phase });
+        debugProviderDiagnostic("anthropic", "side-chat-cache", { reason: sideChat.reason, matchedItems: sideChat.matchedItems, phase: sideChat.metrics.phase,
+          ...(sideChat.toolDelta ? { toolDelta: sideChat.toolDelta } : {}) });
       }
       let astraEffortCache: AdapterRequest["astraEffortCache"];
       if (supportsAnthropicPerMessageEffort(parsed.modelId) && wireBody.output_config !== undefined) {
