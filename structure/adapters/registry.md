@@ -198,3 +198,22 @@ Muse reasoning metadata follows the [exact catalog ladder](../catalog.md#opencod
 
 A [manual compaction override](../transports/responses.md#manual-compaction-overrides) selects its target before adapter resolution and uses the existing registry factory.
 Shared response-log retention and native SSE inspection pacing follow the [bounded inspection contract](../transports/byte-accounting.md#response-log-inspection); other subsystem behavior remains unchanged.
+
+## Anthropic side-task descriptions and effort history
+
+`src/adapters/anthropic-side-chat-cache.ts` preserves compatible parent tool order and
+system text. On Fable 5.1, Mythos 5.1, and Opus 5, description-only changes retain the
+original tool definitions and append current descriptions as a system message after
+the fork's user turn. Replays require the complete original prefix at each stored
+insertion point; later updates append at a new user boundary. Added or removed tools
+and schema changes decline reuse. The adapter keeps at most 64 snapshots for ten minutes,
+each limited to 1 MiB serialized UTF-8 and 32 description updates. Definitions and
+updates own their retained data; diagnostic output excludes their contents.
+
+`src/adapters/anthropic-effort-cache.ts` accepts these content system messages while
+rejecting caller-supplied effort overrides and turn-scoped system fields. It evicts
+oldest snapshots to fit its 256-entry and serialized-state bounds. Each remaining
+snapshot carries the complete baseline and effort-update history. This is preparation
+state, not proof of a completed request or an upstream cache hit. Focused coverage is
+in `tests/adapters/anthropic/anthropic-side-chat-cache.test.ts` and
+`tests/adapters/anthropic/anthropic-effort-cache.test.ts`.

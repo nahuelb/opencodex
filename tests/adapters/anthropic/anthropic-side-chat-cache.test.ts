@@ -66,7 +66,7 @@ describe("Anthropic side-chat prefix reuse", () => {
     expect(later.metrics).toMatchObject({ phase: "bound-side", expiredEntries: 1 });
     expect(later.body.tools).toEqual([toolA, toolB]);
     expect(cache.parentToolOrder({ thread: "child", parent: "parent", scope }, [toolB, toolA])).toEqual(["alpha", "beta"]);
-    expect(cache.parentToolOrder({ thread: "child", parent: "parent", scope }, [toolB, { ...toolA, description: "changed" }])).toBeUndefined();
+    expect(cache.parentToolOrder({ thread: "child", parent: "parent", scope }, [toolB, { ...toolA, input_schema: { type: "string" } }])).toBeUndefined();
   });
 
   test("a bound fork keeps its established shape when its own prefix changes", () => {
@@ -104,6 +104,32 @@ describe("Anthropic side-chat prefix reuse", () => {
       { thread: "child", parent: "parent", scope });
     expect(side.reason).toBe("inherited-with-tail-rules");
     expect(side.body.messages).toEqual([...history, user(SIDE_CHAT_RULES), user(SIDE_CHAT_BOUNDARY), user("q")]);
+  });
+
+  test("description updates are model-gated and never replay across edited inherited history", () => {
+    const cache = new AnthropicSideChatCache();
+    cache.prepare(parentBody, { thread: "parent", scope });
+    const changed = { ...sideBody, model: "claude-fable-5-1", tools: [toolB, { ...toolA, description: "child helpers" }] };
+    expect(cache.prepare({ ...changed, model: "claude-sonnet-5" }, { thread: "unsupported", parent: "parent", scope }).reason).toBe("settings-change");
+    const first = cache.prepare(changed, { thread: "child", parent: "parent", scope });
+    expect(first.reason).toBe("inherited-with-tail-rules");
+    const compacted = { ...changed, messages: [user("summary"), assistant("ok"), user(SIDE_CHAT_BOUNDARY), user("q")] };
+    const decision = cache.prepare(compacted, { thread: "child", parent: "parent", scope });
+    expect(decision.reason).toBe("input-prefix-change");
+    expect(decision.body).toBe(compacted);
+  });
+
+  test("retained tool definitions own their data and have a byte bound", () => {
+    const cache = new AnthropicSideChatCache();
+    const mutable = structuredClone(parentBody);
+    cache.prepare(mutable, { thread: "parent", scope });
+    mutable.tools[0]!.input_schema.type = "string";
+    const child = cache.prepare({ ...sideBody, model: "claude-fable-5-1", tools: [toolB, { ...toolA, description: "new" }] }, { thread: "child", parent: "parent", scope });
+    expect(child.reason).toBe("inherited-with-tail-rules");
+    expect(child.body.tools).toEqual(parentBody.tools);
+    const large = { ...parentBody, tools: [{ ...toolA, description: "x".repeat(1024 * 1024) }] };
+    expect(cache.prepare(large, { thread: "large", scope })).toMatchObject({ reason: "ineligible", body: large });
+    expect(cache.size).toBe(2);
   });
 
   test("reads Desktop fork identity from headers and client metadata", () => {
@@ -154,11 +180,50 @@ describe("Anthropic adapter side-chat wiring", () => {
     expect(sideRequest.astraEffortCache).toMatchObject({ status: "replay", updateCount: 1 });
   });
 
+  test("description changes keep the inherited wire prefix and replay after the fork question", async () => {
+    const adapter = withTestTranslatorBudget(createAnthropicAdapter(provider, "none"));
+    const meta = { headers: new Headers() } as any;
+    await adapter.buildRequest(parsed("Base", parentMessages.slice(0, 1)), meta);
+    const parentRequest = await adapter.buildRequest({ ...parsed("Base", parentMessages), options: { reasoning: "high" } }, meta);
+    const parentWire = JSON.parse(parentRequest.body as string);
+    const changedTools = [{ ...tools[1], description: "Use the side task helpers." }, tools[0]];
+    const sideMessages = [...parentMessages, { role: "assistant", content: [{ type: "text", text: "two" }] },
+      { role: "user", content: SIDE_CHAT_BOUNDARY }, { role: "user", content: "side question" }];
+    const request = parsed(`Base\n\n${SIDE_CHAT_RULES}`, sideMessages, changedTools, "child-description", "parent");
+    request.options.reasoning = "high";
+    const first = await adapter.buildRequest(request, meta);
+    const wire = JSON.parse(first.body as string);
+    expect(first.sideChatCache?.reason).toBe("inherited-with-tail-rules");
+    expect(wire.tools).toEqual(parentWire.tools);
+    expect(wire.system).toEqual(parentWire.system);
+    expect(wire.output_config).toEqual(parentWire.output_config);
+    expect(wire.messages.slice(0, parentWire.messages.length)).toEqual(parentWire.messages);
+    expect(wire.messages.at(-1)).toMatchObject({ role: "system" });
+    expect(wire.messages.at(-1).content[0].text).toContain("Use the side task helpers.");
+    expect(first.astraEffortCache).toMatchObject({ status: "replay", updateCount: 1 });
+    const followUp = await adapter.buildRequest({ ...request, context: { ...request.context,
+      messages: [...request.context.messages, { role: "assistant", content: [{ type: "text", text: "answer" }] },
+        { role: "user", content: "next" }] } } as OcxParsedRequest, meta);
+    const followWire = JSON.parse(followUp.body as string);
+    expect(followWire.messages.slice(0, wire.messages.length)).toEqual(wire.messages);
+    expect(followWire.tools).toEqual(wire.tools);
+    expect(followUp.astraEffortCache?.status).toBe("replay");
+    const reverted = await adapter.buildRequest({ ...request, context: { ...request.context, tools,
+      messages: [...request.context.messages, { role: "assistant", content: [{ type: "text", text: "answer" }] },
+        { role: "user", content: "next" }, { role: "assistant", content: [{ type: "text", text: "again" }] },
+        { role: "user", content: "restore tools" }] } } as OcxParsedRequest, meta);
+    const revertedWire = JSON.parse(reverted.body as string);
+    expect(revertedWire.messages.slice(0, followWire.messages.length)).toEqual(followWire.messages);
+    expect(revertedWire.messages.at(-1).role).toBe("system");
+    expect(revertedWire.tools).toEqual(wire.tools);
+
+  });
+
   test("a fork whose tool schemas differ keeps its own order and reports the change", async () => {
     const adapter = withTestTranslatorBudget(createAnthropicAdapter(provider));
     const meta = { headers: new Headers() } as any;
     await adapter.buildRequest(parsed("Base", parentMessages), meta);
-    const changedTools = [{ ...tools[1], description: "changed" }, tools[0]];
+    const changedTools = [{ ...tools[1], parameters: { type: "object", properties: { query: { type: "string" } } } }, tools[0]];
     const sideMessages = [...parentMessages, { role: "assistant", content: [{ type: "text", text: "two" }] }, { role: "user", content: SIDE_CHAT_BOUNDARY }, { role: "user", content: "q" }];
     const sideRequest = await adapter.buildRequest(parsed(`Base\n\n${SIDE_CHAT_RULES}`, sideMessages, changedTools, "child-b", "parent"), meta);
     const sideBody = JSON.parse(sideRequest.body as string);

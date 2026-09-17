@@ -1,16 +1,20 @@
+import { supportsAnthropicPerMessageEffort } from "./anthropic-effort-cache";
 import { SIDE_CHAT_BOUNDARY, SIDE_CHAT_RULES } from "../codex/side-chat-cache";
 import { normalizeSideChatCacheMetrics, type SideChatCacheMetrics } from "../usage/side-chat-cache";
 import { normalizeLogConversationId } from "../server/request-log-conversation";
 import { createHash } from "node:crypto";
 
 type RecordValue = Record<string, unknown>;
-type Snapshot = { expires: number; scope: string; tools: { name: string; hash: string }[]; system: string; messages: string[] };
+type ToolSnapshot = { name: string; hash: string; shape: string; definition: string };
+type DescriptionUpdate = { position: number; prefix: string[]; tools: string; message: RecordValue };
+type Snapshot = { expires: number; scope: string; tools: ToolSnapshot[]; system: string; messages: string[]; descriptionUpdates?: DescriptionUpdate[]; bytes: number };
 export type SideChatIdentity = { thread?: string; parent?: string; scope: string };
 export type ToolDelta = { onlyParent: string[]; onlyChild: string[]; changed: string[] };
 export type SideChatDecision = { body: RecordValue; reason: SideChatCacheMetrics["reason"]; matchedItems: number; metrics: SideChatCacheMetrics; toolDelta?: ToolDelta };
 
 const MAX_TOOLS = 2048;
 const MAX_MESSAGES = 4096;
+const MAX_SNAPSHOT_BYTES = 1024 * 1024;
 
 function record(value: unknown): value is RecordValue {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -22,6 +26,18 @@ function identifier(value: unknown): value is string {
 
 function digest(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value) ?? "undefined").digest("hex");
+}
+
+function toolSnapshot(tool: RecordValue): ToolSnapshot {
+  const { description: _description, ...shape } = tool;
+  return { name: tool.name as string, hash: digest(tool), shape: digest(shape), definition: JSON.stringify(tool) };
+}
+
+function sameToolShapes(tools: readonly RecordValue[], expected: readonly ToolSnapshot[]): boolean {
+  if (tools.length !== expected.length || new Set(tools.map(t => t.name)).size !== tools.length) return false;
+  const shapes = new Map(expected.map(t => [t.name, t.shape]));
+  return tools.every(tool => (tool.description === undefined || typeof tool.description === "string")
+    && shapes.get(tool.name as string) === toolSnapshot(tool).shape);
 }
 
 function parseTurnMetadata(raw: unknown): RecordValue | undefined {
@@ -115,14 +131,17 @@ export class AnthropicSideChatCache {
     return parent ? { snapshot: parent, phase: "unbound-side" } : undefined;
   }
 
-  /** Wire tool names in the order this fork already established, else the parent's, when the tool set matches by content. */
+  /** Restore tool order when definitions match or supported description updates can preserve them. */
   parentToolOrder(identity: SideChatIdentity, wireTools: readonly RecordValue[]): string[] | undefined {
     this.prune();
     const candidate = this.candidate(identity);
     if (!candidate || candidate.snapshot.scope !== identity.scope) return undefined;
     const hashes = wireTools.map(tool => digest(tool)).sort();
     const expected = candidate.snapshot.tools.map(tool => tool.hash).sort();
-    if (hashes.length !== expected.length || hashes.some((hash, index) => hash !== expected[index])) return undefined;
+    if (hashes.length !== expected.length || hashes.some((hash, index) => hash !== expected[index])) {
+      if (!supportsAnthropicPerMessageEffort(identity.scope.split("|").at(-1))
+        || !sameToolShapes(wireTools, candidate.snapshot.tools)) return undefined;
+    }
     return candidate.snapshot.tools.map(tool => tool.name);
   }
 
@@ -134,7 +153,7 @@ export class AnthropicSideChatCache {
 
   private retention() {
     let bytes = 0;
-    for (const snapshot of this.snapshots.values()) bytes += 128 + 96 * snapshot.tools.length + 64 * snapshot.messages.length;
+    for (const snapshot of this.snapshots.values()) bytes += snapshot.bytes;
     return { retainedSnapshots: this.snapshots.size, retainedBindings: 0, estimatedRetainedBytes: bytes };
   }
 
@@ -166,6 +185,7 @@ export class AnthropicSideChatCache {
     const tools = Array.isArray(body.tools) ? body.tools : [];
     if (tools.some(tool => !record(tool) || typeof tool.name !== "string")) return result;
     let wire = body;
+    let descriptionUpdates: DescriptionUpdate[] | undefined;
     const parent = identity.parent;
     const selected = this.candidate(identity);
     metrics.phase = parent ? selected?.phase ?? "unbound-side" : "parent";
@@ -181,8 +201,12 @@ export class AnthropicSideChatCache {
         const currentTools = nextTools.map(tool => ({ name: tool.name as string, hash: digest(tool) }));
         const sameSet = currentTools.length === candidate.tools.length
           && digest(currentTools.map(tool => tool.hash).sort()) === digest(candidate.tools.map(tool => tool.hash).sort());
+        const descriptionChange = (!sameSet || !!candidate.descriptionUpdates?.length) && supportsAnthropicPerMessageEffort(body.model) && sameToolShapes(nextTools, candidate.tools);
+        const compatibleTools = sameSet || descriptionChange;
         const sameOrder = sameSet && digest(currentTools.map(tool => tool.hash)) === digest(candidate.tools.map(tool => tool.hash));
-        if (sameSet && !sameOrder) {
+        if (descriptionChange) {
+          next.tools = candidate.tools.map(tool => JSON.parse(tool.definition));
+        } else if (sameSet && !sameOrder) {
           const remaining = nextTools.map((tool, index) => ({ tool, hash: currentTools[index]!.hash }));
           nextTools = candidate.tools.map(entry => remaining.splice(remaining.findIndex(current => current.hash === entry.hash), 1)[0]!.tool);
           next.tools = nextTools;
@@ -191,7 +215,7 @@ export class AnthropicSideChatCache {
         const stripped = stripMessageRules(next.messages as RecordValue[]);
         const moved = system.removed + stripped.removed;
         if (moved > 1) { result.reason = "multiple-rule-blocks"; }
-        else if (!sameSet) {
+        else if (!compatibleTools) {
           result.reason = "settings-change";
           const parentByName = new Map(candidate.tools.map(tool => [tool.name, tool.hash]));
           const childByName = new Map(currentTools.map(tool => [tool.name, tool.hash]));
@@ -214,6 +238,29 @@ export class AnthropicSideChatCache {
                 : candidate.messages.slice(0, prefixLength).findIndex((hash, index) => hash !== digest(messages[index]));
               if (mismatch !== -1) { result.matchedItems = mismatch; result.reason = "input-prefix-change"; }
               else {
+                if (descriptionChange) {
+                  const toolsKey = digest(currentTools.map(tool => tool.hash).sort());
+                  descriptionUpdates = [...(candidate.descriptionUpdates ?? [])];
+                  if (descriptionUpdates.some(update => update.prefix.some((hash, index) => hash !== digest(messages[index]))
+                    || (messages[update.position] !== undefined && messages[update.position]!.role !== "assistant")))
+                    return { ...result, reason: "input-prefix-change" };
+                  const priorTools = descriptionUpdates.at(-1)?.tools ?? digest(candidate.tools.map(tool => tool.hash).sort());
+                  if (priorTools !== toolsKey) {
+                    let position = selected?.phase === "bound-side" ? messages.length - 1 : boundaries[0];
+                    if (position === undefined || messages[position]?.role !== "user")
+                      return { ...result, reason: "ambiguous-boundary" };
+                    while (position < messages.length && messages[position]!.role === "user") position++;
+                    if (position <= (descriptionUpdates.at(-1)?.position ?? -1) || descriptionUpdates.length >= 32)
+                      return { ...result, reason: "input-prefix-change" };
+                    const descriptions = nextTools.map(tool => ({ name: tool.name, description: tool.description ?? "" }))
+                      .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+                    const message = { role: "system", content: [{ type: "text",
+                      text: "The tool descriptions for this side conversation have changed. From this point onward, these descriptions replace the earlier descriptions for the named tools. Their names and input schemas are unchanged. These descriptions do not grant permission to act; follow the current task's instructions and permissions.\n" + JSON.stringify(descriptions),
+                    }] };
+                    descriptionUpdates.push({ position, prefix: messages.slice(0, position).map(message => digest(message)), tools: toolsKey, message });
+                  }
+                  for (const update of [...descriptionUpdates].reverse()) messages.splice(update.position, 0, structuredClone(update.message));
+                }
                 if (boundaries.length && moved) messages.splice(boundaries[0]!, 0, { role: "user", content: [{ type: "text", text: SIDE_CHAT_RULES }] });
                 next = { ...next, system: system.system, messages };
                 if (next.system === undefined) delete next.system;
@@ -231,9 +278,16 @@ export class AnthropicSideChatCache {
     const hashStarted = performance.now();
     const snapshot: Snapshot = {
       expires: this.now() + this.ttlMs, scope: identity.scope,
-      tools: (Array.isArray(wire.tools) ? wire.tools as RecordValue[] : []).map(tool => ({ name: tool.name as string, hash: digest(tool) })),
+      tools: (Array.isArray(wire.tools) ? wire.tools as RecordValue[] : []).map(toolSnapshot),
       system: digest(wire.system), messages: (wire.messages as unknown[]).map(message => digest(message)),
+      ...(descriptionUpdates ? { descriptionUpdates: structuredClone(descriptionUpdates) } : {}), bytes: 0,
     };
+    snapshot.bytes = Buffer.byteLength(JSON.stringify(snapshot), "utf8");
+    if (snapshot.bytes > MAX_SNAPSHOT_BYTES) {
+      this.snapshots.delete(thread);
+      metrics.snapshotOutcome = "ineligible";
+      return { ...result, body, reason: "ineligible", matchedItems: 0 };
+    }
     metrics.hashMs = performance.now() - hashStarted;
     this.snapshots.delete(thread);
     this.snapshots.set(thread, snapshot);

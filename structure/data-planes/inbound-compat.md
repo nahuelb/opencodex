@@ -338,3 +338,6 @@ Requests translated onto the Responses passthrough inherit its [final wire-effor
 
 The [manual compaction override](../transports/responses.md#manual-compaction-overrides) requires original Responses ingress; translated Chat and Messages calls retain their own routing.
 Shared response-log retention and native SSE inspection pacing follow the [bounded inspection contract](../transports/byte-accounting.md#response-log-inspection); other subsystem behavior remains unchanged.
+
+Anthropic side-task tool-description replay and bounded effort-history retention follow
+the [adapter cache contract](../adapters/registry.md#anthropic-side-task-descriptions-and-effort-history).

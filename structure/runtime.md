@@ -552,3 +552,6 @@ stamps the configured key selected for the physical request. `src/server/request
 retains per-key attempt usage, and `src/usage/log.ts` validates and persists labels. The
 [account attribution contract](gui-and-management-api.md#upstream-key-account-attribution)
 defines identity, unknown records, and aggregation boundaries.
+
+Anthropic side-task tool-description replay and bounded effort-history retention follow
+the [adapter cache contract](adapters/registry.md#anthropic-side-task-descriptions-and-effort-history).

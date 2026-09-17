@@ -58,7 +58,7 @@ function unsupported(body: RecordValue): AstraEffortCacheMetrics["status"] | und
   if (!record(body.output_config) || !effort(body.output_config.effort)) return "unsupported_effort";
   if (!record(body.thinking) || body.thinking.type !== "adaptive") return "unsupported_mode";
   if (!Array.isArray(body.messages) || body.messages.length === 0 || body.messages.length > MAX_ITEMS) return "unsupported_input";
-  if (body.messages.some(m => !record(m) || m.role === "system")) return "unsupported_input";
+  if (body.messages.some(m => !record(m) || (m.role === "system" && (m.output_config !== undefined || m.clear_at !== undefined)))) return "unsupported_input";
   return undefined;
 }
 
@@ -147,10 +147,14 @@ function applyInner(
         if (!result.snapshot) return { value: result, state: null };
         const snapshot = result.snapshot;
         if (!state.snapshots.some(s => JSON.stringify(s) === JSON.stringify(snapshot))) {
-          if (state.snapshots.length >= MAX_SNAPSHOTS) return { value: fallback("state_limit") };
           state.snapshots.push(snapshot);
+          if (state.snapshots.length > MAX_SNAPSHOTS) state.snapshots.shift();
         }
-        const next = JSON.stringify(state);
+        let next = JSON.stringify(state);
+        while (next.length > MAX_STATE_BYTES && state.snapshots.length > 1) {
+          state.snapshots.shift();
+          next = JSON.stringify(state);
+        }
         if (next.length > MAX_STATE_BYTES) return { value: fallback("state_limit") };
         return { value: { body: result.body, headers: result.headers, status: result.status, baseline: result.baseline, effective: result.effective }, state: next };
       } finally { measurement.historyMs = performance.now() - started; }

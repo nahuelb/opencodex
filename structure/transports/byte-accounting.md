@@ -102,3 +102,6 @@ invent usage for an unreported failed send, retry a failed factory, or turn fail
 Source-iteration exceptions still propagate to the caller. Returning the guard iterator closes
 its active source; cancellation at an assistant boundary does not start the continuation callback.
 The same focused tests cover these lifecycle paths and Unicode code-unit limit boundaries.
+
+Anthropic side-task tool-description replay and bounded effort-history retention follow
+the [adapter cache contract](../adapters/registry.md#anthropic-side-task-descriptions-and-effort-history).

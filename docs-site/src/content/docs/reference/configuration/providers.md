@@ -1232,7 +1232,14 @@ tool onward. The adapter now remembers the tool order and top-level system text 
 thread it sends, in process memory with the same 64-task, ten-minute bounds as the
 Codex feature. A fork whose tool set and inherited message prefix match its parent is
 sent with the parent's tool order and top-level system text, and the recognized rule text
-moves to a user message at the recognized side boundary. Anything else forwards unchanged.
+moves to a user message at the recognized side boundary.
+On Fable 5.1, Mythos 5.1, and Opus 5, description-only tool changes also preserve the
+parent definitions. The current descriptions are supplied in a system message after
+the fork's first user turn. Follow-ups replay that message at the same position;
+later description changes append another update. Tool names and input schemas must
+still match. Added or removed tools, changed schemas, and incompatible history forward
+unchanged. Each retained snapshot is bounded to 1 MiB of serialized UTF-8 data and
+32 description updates; tool descriptions stay in process memory and are not logged.
 The decision is recorded as `sideChatCache` in `usage.jsonl`; `snapshotOutcome` is
 `stored` at preparation time because no completion gate exists on this path.
 
@@ -1246,7 +1253,14 @@ blocks stay unchanged. The history lives in `$OPENCODEX_HOME/anthropic-effort-ca
 Codex thread, and a side conversation seeds its history from its parent thread. `max_tokens`
 still follows the requested effort. The decision is recorded as `astraEffortCache` with the
 same status vocabulary; `unsupported_model` marks models without per-message effort, which
-keep the plain top-level value.
+keep the plain top-level value. The store retains the latest 256 snapshots, evicting
+older snapshots as the conversation grows. Each retained snapshot includes its complete
+effort-update history, so eviction preserves the baseline for active continuations.
+
+These transformations make compatible prefixes reusable; they do not prove a cache hit.
+Use the provider's reported cache-read tokens to check actual reuse. After a proxy restart,
+a parent request must run before its side task can inherit the in-memory snapshot.
+
 ### Per-model capability declarations
 
 `modelCapabilities` stores explicit declarations keyed by exact upstream model ID. IDs preserve case and must not contain surrounding whitespace. Each entry may contain `inputModalities` (`text`, `image`, `audio`, `video`), `contextTier` (`default`, `long_context`) and `video.processing` (`static`, `agentic`). These are operator declarations, not proof of provider support. Context-tier and video fields currently record intent only and do not activate upstream behavior or increase catalog windows.

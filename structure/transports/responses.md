@@ -1113,3 +1113,6 @@ route where this was first observed; explicit provider and operator caps may onl
 
 Regression coverage: `tests/server/input-admission.test.ts` and
 `tests/helpers/combo-context-headroom-cases.ts`.
+
+Anthropic side-task tool-description replay and bounded effort-history retention follow
+the [adapter cache contract](../adapters/registry.md#anthropic-side-task-descriptions-and-effort-history).

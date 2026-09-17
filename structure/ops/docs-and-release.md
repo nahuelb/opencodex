@@ -403,3 +403,6 @@ The public server configuration reference documents the optional
 [manual compaction override](../transports/responses.md#manual-compaction-overrides). Its regression file is registered in both test-layout inventories.
 
 Shared response-log retention and native SSE inspection pacing follow the [bounded inspection contract](../transports/byte-accounting.md#response-log-inspection); other subsystem behavior remains unchanged.
+
+Anthropic side-task tool-description replay and bounded effort-history retention follow
+the [adapter cache contract](../adapters/registry.md#anthropic-side-task-descriptions-and-effort-history).

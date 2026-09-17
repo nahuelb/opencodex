@@ -155,3 +155,6 @@ Canonical Responses identity sanitation and narrowly scoped pre-output combo rec
 Generic Responses [wire-effort logging](../transports/responses.md#passthrough-effort-logging) belongs to the passthrough adapter; Cursor continues to use its native execution path.
 
 Upstream API-key usage follows the [physical-attempt account attribution contract](../gui-and-management-api.md#upstream-key-account-attribution), independently of subscription quota observations.
+
+Anthropic side-task tool-description replay and bounded effort-history retention follow
+the [adapter cache contract](../adapters/registry.md#anthropic-side-task-descriptions-and-effort-history).

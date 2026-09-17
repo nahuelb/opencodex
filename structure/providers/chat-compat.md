@@ -367,3 +367,6 @@ Cursor's Muse Spark 1.3 catalog, wire efforts, native image input, and price sou
 Zen Muse Responses uses the [exact Muse ladder](../catalog.md#opencode-muse-effort-ladders) and [passthrough effort metadata](../transports/responses.md#passthrough-effort-logging), separate from Chat wire fields.
 
 Upstream API-key usage follows the [physical-attempt account attribution contract](../gui-and-management-api.md#upstream-key-account-attribution), independently of subscription quota observations.
+
+Anthropic side-task tool-description replay and bounded effort-history retention follow
+the [adapter cache contract](../adapters/registry.md#anthropic-side-task-descriptions-and-effort-history).

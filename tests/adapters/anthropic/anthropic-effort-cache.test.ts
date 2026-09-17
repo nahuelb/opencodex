@@ -116,6 +116,22 @@ describe("Anthropic per-message effort history", () => {
     expect(applyAnthropicEffortCache(body([...second, assistant("OK"), user("side question")], "low"), { thread: "child" }, ["https://api.anthropic.com"], join(directory, "state")).status).toBe("replay");
   });
 
+  test("evicts old snapshots without losing effort updates in long conversations or forks", () => {
+    const messages = [...first];
+    run(messages);
+    for (let i = 0; i < 260; i++) {
+      messages.push(user(`turn ${i}`));
+      const result = run(messages, "high");
+      expect(result.status).toBe(i === 0 ? "updated" : "replay");
+      expect(result.baseline).toBe("medium");
+      expect(result.metrics?.updateCount).toBe(1);
+    }
+    const child = applyAnthropicEffortCache(body([...messages, user("side question")], "low"),
+      { thread: "child-long", parent: "thread-a" }, ["https://api.anthropic.com"], join(directory, "state"));
+    expect(child).toMatchObject({ status: "updated", baseline: "medium", effective: "low" });
+    expect(child.metrics?.updateCount).toBe(2);
+  });
+
   test("skips unsupported models and non-adaptive thinking", () => {
     expect(run(first, "medium", "thread-a", { model: "claude-fable-5" }).status).toBe("unsupported_model");
     expect(run(first, "medium", "thread-a", { thinking: { type: "enabled", budget_tokens: 2048 } }).status).toBe("unsupported_mode");
