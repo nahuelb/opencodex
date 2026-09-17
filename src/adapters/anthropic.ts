@@ -1,6 +1,6 @@
-import type { IncomingMeta, ProviderAdapter } from "./base";
+import type { AdapterRequest, IncomingMeta, ProviderAdapter } from "./base";
 import { createToolCallIdAllocator, type ToolCallIdAllocator } from "./tool-call-id";
-import { debugDroppedFrame } from "../lib/debug";
+import { debugDroppedFrame, debugProviderDiagnostic } from "../lib/debug";
 import type {
   AdapterEvent,
   OcxAssistantMessage,
@@ -29,6 +29,8 @@ import { decodeServerSentEvents } from "../lib/sse-decoder";
 import { isTranslatorBudgetExceededError, retainTranslatedEventBatch, type TranslatorBudget } from "../lib/translator-budget";
 import { isReasoningEffortOmitted, modelRecordValue } from "../reasoning-effort";
 import { applyAgentRouterLanguageFraming, isAgentRouterEndpoint } from "./agentrouter";
+import { applyAnthropicEffortCache, supportsAnthropicPerMessageEffort } from "./anthropic-effort-cache";
+import { codexSideChatIdentity, parentSideChatToolOrder, prepareAnthropicSideChatCache, reorderTools } from "./anthropic-side-chat-cache";
 
 /** Map a user content part to an Anthropic content block (text or image source). */
 function toAnthropicContentPart(p: OcxContentPart): unknown {
@@ -345,6 +347,14 @@ function extractAnthropicErrorDetail(parsed: unknown): string | undefined {
       : msg.trim();
   }
   return undefined;
+}
+
+function appendHeaderValue(headers: Record<string, string>, name: string, value: string): void {
+  const existing = Object.keys(headers).find(key => key.toLowerCase() === name.toLowerCase());
+  if (existing === undefined) { headers[name] = value; return; }
+  const parts = headers[existing].split(",").map(part => part.trim()).filter(Boolean);
+  if (!parts.includes(value)) parts.push(value);
+  headers[existing] = parts.join(",");
 }
 
 function usesNativeAnthropicEndpoint(provider: OcxProviderConfig): boolean {
@@ -939,6 +949,14 @@ export function createAnthropicAdapter(provider: OcxProviderConfig, cacheRetenti
         throw new Error("anthropic provider requires a non-empty apiKey (authMode: key)");
       }
 
+      // The tool catalog nudge lists tools in request order, so a fork restores its parent's order first.
+      const sideChatIdentity = codexSideChatIdentity(parsed._rawBody, incoming?.headers, `${provider.baseUrl}|${parsed.modelId}`);
+      const parentToolOrder = parsed.context.tools?.length ? parentSideChatToolOrder(sideChatIdentity) : undefined;
+      if (parentToolOrder) {
+        const wireName = (tool: { namespace?: string; name: string }) => toolNames.toWire(namespacedToolName(tool.namespace, tool.name));
+        const ordered = reorderTools(parsed.context.tools!, parentToolOrder, wireName);
+        parsed = { ...parsed, context: { ...parsed.context, tools: ordered } };
+      }
       const { system, messages } = messagesToAnthropicFormat(parsed, toolNames);
       // Before image normalization, so the framing block is present for every downstream pass.
       if (isAgentRouterEndpoint(provider.baseUrl)) applyAgentRouterLanguageFraming(messages);
@@ -1090,20 +1108,40 @@ export function createAnthropicAdapter(provider: OcxProviderConfig, cacheRetenti
       }
       if (provider.headers) Object.assign(headers, provider.headers);
 
+      // Side-chat prefix reuse runs before the effort step so both see the same tools and system text.
+      const sideChat = prepareAnthropicSideChatCache(body, sideChatIdentity);
+      let wireBody: Record<string, unknown> = sideChat?.body ?? body;
+      if (sideChat) {
+        debugProviderDiagnostic("anthropic", "side-chat-cache", { reason: sideChat.reason, matchedItems: sideChat.matchedItems, phase: sideChat.metrics.phase });
+      }
+      let astraEffortCache: AdapterRequest["astraEffortCache"];
+      if (supportsAnthropicPerMessageEffort(parsed.modelId) && wireBody.output_config !== undefined) {
+        const effortResult = applyAnthropicEffortCache(wireBody, sideChatIdentity, [provider.baseUrl]);
+        wireBody = effortResult.body;
+        astraEffortCache = effortResult.metrics;
+        for (const [name, value] of Object.entries(effortResult.headers)) appendHeaderValue(headers, name, value);
+        debugProviderDiagnostic("anthropic", "effort-cache", { status: effortResult.status,
+          baseline: effortResult.baseline, effective: effortResult.effective, metrics: astraEffortCache });
+      }
+
       // Prompt caching: native Anthropic supports top-level automatic caching, which
       // follows the moving final block across turns. Keep one breakpoint slot free for it.
       const cc = resolveCacheControl(cacheRetention);
       const automaticPromptCaching = cc && usesNativeAnthropicEndpoint(provider);
-      if (automaticPromptCaching) body.cache_control = cc;
+      if (automaticPromptCaching) wireBody.cache_control = cc;
       const explicitLimit = automaticPromptCaching ? MAX_CACHE_BREAKPOINTS - 1 : MAX_CACHE_BREAKPOINTS;
-      applyPromptCaching(body, cc, {
+      applyPromptCaching(wireBody, cc, {
         maxExplicitBreakpoints: explicitLimit,
         skipLastUser: !!automaticPromptCaching,
       });
-      enforceCacheControlLimit(body, explicitLimit);
-      normalizeTtlOrdering(body);
+      enforceCacheControlLimit(wireBody, explicitLimit);
+      normalizeTtlOrdering(wireBody);
 
-      return { url, method: "POST", headers, body: JSON.stringify(body) };
+      return {
+        url, method: "POST", headers, body: JSON.stringify(wireBody),
+        ...(astraEffortCache ? { astraEffortCache } : {}),
+        ...(sideChat ? { sideChatCache: sideChat.metrics } : {}),
+      };
     },
 
     async *parseStream(response: Response, budget: TranslatorBudget): AsyncGenerator<AdapterEvent> {

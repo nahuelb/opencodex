@@ -1219,6 +1219,34 @@ It writes `report.json` and `samples.jsonl`, recording the source commit, dirty 
 identity, and observed upstream transports. Fixture WebSocket availability does not imply its use:
 runtime gates can select HTTP fallback. Synthetic usage counters are fixtures, never measured cache
 savings. Run on the target operating system and validate actual Desktop behavior with ordinary usage.
+
+### Anthropic Desktop cache preservation
+
+The `anthropic` adapter applies two automatic, body-only counterparts of the features
+above. Neither has a setting.
+
+Anthropic hashes the request prefix in order: `tools`, then `system`, then `messages`.
+A Desktop side conversation appends its rule text to the instructions and can offer the
+same tools in another order, so the inherited history missed the cache from the first
+tool onward. The adapter now remembers the tool order and top-level system text of each
+thread it sends, in process memory with the same 64-task, ten-minute bounds as the
+Codex feature. A fork whose tool set and inherited message prefix match its parent is
+sent with the parent's tool order and top-level system text, and the recognized rule text
+moves to a user message at the recognized side boundary. Anything else forwards unchanged.
+The decision is recorded as `sideChatCache` in `usage.jsonl`; `snapshotOutcome` is
+`stored` at preparation time because no completion gate exists on this path.
+
+Changing the top-level `output_config.effort` re-renders the prompt and restarts the cache.
+On `claude-fable-5-1`, `claude-mythos-5-1`, and `claude-opus-5`, the adapter pins the
+top-level effort to the value the thread started with and carries later changes as
+per-message effort updates: an empty `role: "system"` message with `output_config.effort`
+placed before the user turn where the change was first observed, sent with the
+`mid-conversation-output-config-2026-07-01` beta header. Earlier turns and their thinking
+blocks stay unchanged. The history lives in `$OPENCODEX_HOME/anthropic-effort-cache`, keyed by
+Codex thread, and a side conversation seeds its history from its parent thread. `max_tokens`
+still follows the requested effort. The decision is recorded as `astraEffortCache` with the
+same status vocabulary; `unsupported_model` marks models without per-message effort, which
+keep the plain top-level value.
 ### Per-model capability declarations
 
 `modelCapabilities` stores explicit declarations keyed by exact upstream model ID. IDs preserve case and must not contain surrounding whitespace. Each entry may contain `inputModalities` (`text`, `image`, `audio`, `video`), `contextTier` (`default`, `long_context`) and `video.processing` (`static`, `agentic`). These are operator declarations, not proof of provider support. Context-tier and video fields currently record intent only and do not activate upstream behavior or increase catalog windows.
