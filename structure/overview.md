@@ -152,3 +152,4 @@ The test-layout maps register the dedicated [Responses effort logging regression
 
 Manual Codex compaction can select a request-local model through the
 [existing Responses handlers](transports/responses.md#manual-compaction-overrides), while subsequent turns keep their conversation settings.
+Shared response-log retention and native SSE inspection pacing follow the [bounded inspection contract](transports/byte-accounting.md#response-log-inspection); other subsystem behavior remains unchanged.
