@@ -513,9 +513,10 @@ including their `-contributor-free` variants, through `/zen/v1/responses`. Other
 their existing routes. The `opencode-zen` and `opencode-free` presets send the User-Agent
 `opencodex opencode/<version>`, because since 2026-09-16 Zen admits free models only when the
 User-Agent carries an `opencode/<version>` token, and derive an opaque `x-opencode-session`
-header from the client's conversation ID. The value stays stable across turns and differs
-between conversations and sibling subagents. An explicit provider session header takes
-precedence, and a provider User-Agent override replaces the registry value entirely.
+header from the client's conversation ID in OpenCode's own `ses_` ID shape, which the same gate
+checks. The value stays stable across turns and differs between conversations and sibling
+subagents. An explicit provider session header takes precedence, and a provider User-Agent
+override replaces the registry value entirely.
 
 These Muse models offer exactly `minimal`, `low`, `medium`, `high`, and `xhigh` in the Codex
 picker on `opencode-zen` and `opencode-free`. Go's Muse 1.3/1.2 contributor models use the

@@ -14,17 +14,25 @@ function hasHeaderCaseInsensitive(
   return Object.keys(headers ?? {}).some(key => key.toLowerCase() === target);
 }
 
+/** Zen's free-tier gate accepts only OpenCode-shaped session IDs: `ses_` plus 26 characters. */
+const OPENCODE_ZEN_SESSION_ID_LENGTH = 26;
+
 function deriveOpenCodeSessionId(sessionLane: string, providerId: string): string {
   const digest = createHash("sha256")
     .update(`opencodex/${providerId}/session/v1\0`)
     .update(sessionLane)
-    .digest("hex")
-    .slice(0, 32);
-  return `ocx_${digest}`;
+    .digest("hex");
+  return providerId === "opencode-zen"
+    ? `ses_${digest.slice(0, OPENCODE_ZEN_SESSION_ID_LENGTH)}`
+    : `ocx_${digest.slice(0, 32)}`;
 }
 
 export function deriveOpenCodeGoSessionId(sessionLane: string): string {
   return deriveOpenCodeSessionId(sessionLane, "opencode-go");
+}
+
+export function deriveOpenCodeZenSessionId(sessionLane: string): string {
+  return deriveOpenCodeSessionId(sessionLane, "opencode-zen");
 }
 
 export function openCodeSessionProviderId(provider: OcxProviderConfig): string | undefined {

@@ -15,6 +15,8 @@ import type { OcxConfig, OcxProviderConfig } from "../../src/types";
 const MUSE_MODEL = "muse-spark-1.3-contributor";
 const CHAT_MODEL = "glm-5.2";
 const SESSION_HEADER = "x-opencode-session";
+/** Zen's gate only admits OpenCode-shaped IDs: `ses_` plus 26 characters. */
+const ZEN_SESSION_SHAPE = /^ses_[0-9a-f]{26}$/;
 
 function opencodeGo(overrides: Partial<OcxProviderConfig> = {}): OcxProviderConfig {
   const entry = getProviderRegistryEntry("opencode-go");
@@ -551,11 +553,11 @@ describe("OpenCode Zen Muse routing", () => {
       const overridden = await captureRequest({ ...input, provider: { ...provider, headers: { "X-OpenCode-Session": "operator-session" } } });
       for (const request of [first, continued, sibling, chat, claude]) {
         expect(request.url).toBe("https://opencode.ai/zen/v1/messages");
-        expect(request.headers.get(SESSION_HEADER)).toMatch(/^ocx_[0-9a-f]{32}$/);
+        expect(request.headers.get(SESSION_HEADER)).toMatch(ZEN_SESSION_SHAPE);
       }
       expect(continued.headers.get(SESSION_HEADER)).toBe(first.headers.get(SESSION_HEADER));
       expect(sibling.headers.get(SESSION_HEADER)).not.toBe(first.headers.get(SESSION_HEADER));
-      expect(missing.headers.get(SESSION_HEADER)).toMatch(/^ocx_[0-9a-f]{32}$/);
+      expect(missing.headers.get(SESSION_HEADER)).toMatch(ZEN_SESSION_SHAPE);
       expect(missing.headers.get(SESSION_HEADER)).not.toBe(first.headers.get(SESSION_HEADER));
       expect(overridden.headers.get(SESSION_HEADER)).toBe("operator-session");
       expect(provider.headers?.[SESSION_HEADER]).toBeUndefined();
@@ -567,7 +569,7 @@ describe("OpenCode Zen Muse routing", () => {
     const input = { providerName: "zen-union", model: "union-alpha", provider };
     const first = await captureRequest(input);
     expect(first.url).toBe("https://opencode.ai/zen/v1/messages");
-    expect(first.headers.get(SESSION_HEADER)).toMatch(/^ocx_[0-9a-f]{32}$/);
+    expect(first.headers.get(SESSION_HEADER)).toMatch(ZEN_SESSION_SHAPE);
     for (const baseUrl of ["https://custom.example/v1", "https://opencode.ai.evil.test/zen/v1"]) {
       const custom = { ...provider, baseUrl };
       expect(resolveOpenCodeGoTransport(custom, "conversation")).toBe(custom);
@@ -586,7 +588,7 @@ describe("OpenCode Zen Muse routing", () => {
         const claude = await captureRequest({ providerName, model, provider, claude: true, headers: codexHeaders() });
         for (const request of [first, continued, sibling, chat, claude]) {
           expect(request.url).toBe("https://opencode.ai/zen/v1/responses");
-          expect(request.headers.get(SESSION_HEADER)).toMatch(/^ocx_[0-9a-f]{32}$/);
+          expect(request.headers.get(SESSION_HEADER)).toMatch(ZEN_SESSION_SHAPE);
           expect(request.headers.get("user-agent")).toBe(OPENCODE_ZEN_USER_AGENT);
           expect(request.headers.has("x-opencode-client")).toBe(false);
         }
@@ -603,6 +605,8 @@ describe("OpenCode Zen Muse routing", () => {
     const go = await captureRequest();
     const request = await captureRequest({ providerName: "opencode-zen", provider: zen(), model: "muse-spark-1.3-contributor-free" });
     expect(request.headers.get(SESSION_HEADER)).not.toBe(go.headers.get(SESSION_HEADER));
+    expect(go.headers.get(SESSION_HEADER)).toMatch(/^ocx_[0-9a-f]{32}$/);
+    expect(request.headers.get(SESSION_HEADER)).toMatch(ZEN_SESSION_SHAPE);
   });
 
   test("Zen Claude metadata supplies affinity without grouping unrelated conversations", async () => {
@@ -612,12 +616,12 @@ describe("OpenCode Zen Muse routing", () => {
     const other = await captureRequest({ ...input, metadataUserId: "user_test_account__session_conversation-b" });
     const missing = await captureRequest(input);
     const missingAgain = await captureRequest(input);
-    expect(first.headers.get(SESSION_HEADER)).toMatch(/^ocx_[0-9a-f]{32}$/);
+    expect(first.headers.get(SESSION_HEADER)).toMatch(ZEN_SESSION_SHAPE);
     expect(continued.headers.get(SESSION_HEADER)).toBe(first.headers.get(SESSION_HEADER));
     expect(other.headers.get(SESSION_HEADER)).not.toBe(first.headers.get(SESSION_HEADER));
     // Zen now refuses free-model requests without a session, so a sessionless request gets a
     // per-request lane instead of joining another conversation.
-    expect(missing.headers.get(SESSION_HEADER)).toMatch(/^ocx_[0-9a-f]{32}$/);
+    expect(missing.headers.get(SESSION_HEADER)).toMatch(ZEN_SESSION_SHAPE);
     expect(missing.headers.get(SESSION_HEADER)).not.toBe(first.headers.get(SESSION_HEADER));
     expect(missingAgain.headers.get(SESSION_HEADER)).not.toBe(missing.headers.get(SESSION_HEADER));
   });
@@ -628,7 +632,7 @@ describe("OpenCode Zen Muse routing", () => {
     expect(explicit.headers.get(SESSION_HEADER)).toBe("operator-session");
     expect(explicit.headers.get("user-agent")).toBe("my-client");
     const missing = await captureRequest({ ...input, provider: zen(), headers: { "content-type": "application/json" } });
-    expect(missing.headers.get(SESSION_HEADER)).toMatch(/^ocx_[0-9a-f]{32}$/);
+    expect(missing.headers.get(SESSION_HEADER)).toMatch(ZEN_SESSION_SHAPE);
     expect(missing.headers.get("user-agent")).toBe(OPENCODE_ZEN_USER_AGENT);
   });
 

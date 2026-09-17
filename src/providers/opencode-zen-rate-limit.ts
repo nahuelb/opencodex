@@ -9,10 +9,10 @@
  * ~200 requests / 5h quota documented on `opencode-free`.
  *
  * The same module also owns the free-tier admission explanation (#4121):
- * Zen rejects a free-model request without `x-opencode-session` or without an
- * `opencode/<version>` User-Agent token with `MissingSessionID` / `FreeTierError`
- * ("OpenCode's free tier can only be used from within OpenCode"). The registry
- * User-Agent and route-time session identity supply both.
+ * Zen rejects a free-model request without an OpenCode-shaped `x-opencode-session`
+ * (`ses_` + 26 characters) or without an `opencode/<version>` User-Agent token with
+ * `MissingSessionID` / `FreeTierError` ("OpenCode's free tier can only be used from
+ * within OpenCode"). The registry User-Agent and route-time session identity supply both.
  */
 import { validateClientRetryAfterHeader } from "../lib/retry-after";
 import { registryEntryForProviderDestination } from "./registry";
