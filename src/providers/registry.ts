@@ -67,8 +67,9 @@ export function mergeRegistryStaticHeaders(
   if (!userHeaders) return { ...staticHeaders };
   const merged: Record<string, string> = {};
   const claimed = new Set<string>();
+  const replaced = new Set(Object.keys(staticHeaders).map(name => name.toLowerCase()));
   for (const [name, value] of Object.entries(userHeaders)) {
-    if (isSupersededStaticHeader(name, value)) continue;
+    if (replaced.has(name.toLowerCase()) && isSupersededStaticHeader(name, value)) continue;
     merged[name] = value;
     claimed.add(name.toLowerCase());
   }

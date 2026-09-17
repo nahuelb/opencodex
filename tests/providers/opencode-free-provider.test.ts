@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { PROVIDER_REGISTRY } from "../../src/providers/registry";
+import { PROVIDER_REGISTRY, mergeRegistryStaticHeaders } from "../../src/providers/registry";
 import { providerConfigSeed, deriveKeyLoginMap, deriveFeaturedProviderIds } from "../../src/providers/derive";
 import { createOpenAIChatAdapter } from "../../src/adapters/openai-chat";
 import { routedProviderConfig } from "../../src/router";
@@ -127,6 +127,9 @@ describe("opencode-free provider", () => {
         expect(uaKeys).toEqual(["User-Agent"]);
         expect(routed.headers?.["User-Agent"]).toBe(OPENCODE_ZEN_USER_AGENT);
       }
+      // A row that defines no User-Agent of its own keeps the user's value verbatim.
+      const kept = mergeRegistryStaticHeaders({ "x-api-version": "1.0.0" }, { "User-Agent": "opencodex" });
+      expect(kept).toEqual({ "User-Agent": "opencodex", "x-api-version": "1.0.0" });
     });
 
     test("the merged headers reach the wire, not just the resolved config", () => {
