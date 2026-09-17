@@ -9,6 +9,7 @@ import {
   MOONSHOT_INTL_BASE_URL,
 } from "../base-url-choices";
 import { COMMAND_CODE_MODEL_REASONING_EFFORTS } from "../command-code-efforts";
+import { OPENCODE_ZEN_USER_AGENT } from "./opencode-headers";
 import {
   CODEBUDDY_CN_MODELS,
   CODEBUDDY_CN_MODEL_CONTEXT_WINDOWS,
@@ -942,7 +943,7 @@ export const PROVIDER_REGISTRY_EXTENDED: readonly ProviderRegistryEntry[] = [
     modelMaxOutputTokens: { [OPENCODE_ZEN_UNION_ALPHA_MODEL]: OPENCODE_ZEN_UNION_ALPHA_MAX_OUTPUT_TOKENS },
     modelDisplayNames: { [OPENCODE_ZEN_UNION_ALPHA_MODEL]: "Union Alpha Free (Zen)" },
     modelWireDefaults: Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, "openai-responses" as const])),
-    staticHeaders: { "User-Agent": "opencodex" },
+    staticHeaders: { "User-Agent": OPENCODE_ZEN_USER_AGENT },
     preserveCustomDestination: true,
   },
   { id: "vercel-ai-gateway", label: "Vercel AI Gateway", baseUrl: "https://ai-gateway.vercel.sh/v1", adapter: "openai-chat", authKind: "key", dashboardUrl: "https://vercel.com/dashboard" },
@@ -955,9 +956,9 @@ export const PROVIDER_REGISTRY_EXTENDED: readonly ProviderRegistryEntry[] = [
     keyOptional: true,
     featured: true,
     liveModels: true,
-    note: "Key-optional OpenCode Zen free models. OpenCodex identifies itself and derives x-opencode-session from a stable conversation ID. Requests without session identity can receive MissingSessionID; adding a key alone does not supply it. Upstream availability and account restrictions still apply. OpenCode advertises about 200 Big Pickle/free-model requests per 5 hours; short-window limits can be roughly 15-20 requests/minute. When Retry-After is absent, OpenCodex adds a backoff hint. Use opencode-zen for a Zen API key. Free-model prompts may be retained for training. Docs: https://opencode.ai/docs/zen/.",
+    note: "Key-optional OpenCode Zen free models. OpenCodex sends the opencode/<version> User-Agent token Zen requires for free models and derives x-opencode-session from a stable conversation ID, or from a per-request lane when the client sends none. A request Zen still refuses returns MissingSessionID or FreeTierError; adding a key alone does not fix it. Upstream availability and account restrictions still apply. OpenCode advertises about 200 Big Pickle/free-model requests per 5 hours; short-window limits can be roughly 15-20 requests/minute. When Retry-After is absent, OpenCodex adds a backoff hint. Use opencode-zen for a Zen API key. Free-model prompts may be retained for training. Docs: https://opencode.ai/docs/zen/.",
     dashboardUrl: "https://opencode.ai",
-    staticHeaders: { "User-Agent": "opencodex" },
+    staticHeaders: { "User-Agent": OPENCODE_ZEN_USER_AGENT },
     modelReasoningEfforts: {
       ...Object.fromEntries(OPENCODE_FREE_DEEPSEEK_MODELS.map(id => [id, deepseekThinkingEffortsFor(id)])),
       ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, META_MUSE_REASONING_EFFORTS])),

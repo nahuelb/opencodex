@@ -3,6 +3,7 @@ import { clearComboSelectionState, clearComboTargetCooldowns } from "../../src/c
 import { providerConfigSeed } from "../../src/providers/derive";
 import { resolveOpenCodeGoTransport } from "../../src/providers/opencode-go-transport";
 import { getProviderRegistryEntry } from "../../src/providers/registry";
+import { OPENCODE_ZEN_USER_AGENT } from "../../src/providers/registry/opencode-headers";
 import { resolveWireProtocolOverride } from "../../src/server/adapter-resolve";
 import { handleResponses } from "../../src/server/responses/core";
 import { handleResponsesWithPolicyFallback, rankPolicyFallbackCandidates } from "../../src/server/responses/policy-fallback";
@@ -554,7 +555,8 @@ describe("OpenCode Zen Muse routing", () => {
       }
       expect(continued.headers.get(SESSION_HEADER)).toBe(first.headers.get(SESSION_HEADER));
       expect(sibling.headers.get(SESSION_HEADER)).not.toBe(first.headers.get(SESSION_HEADER));
-      expect(missing.headers.has(SESSION_HEADER)).toBe(false);
+      expect(missing.headers.get(SESSION_HEADER)).toMatch(/^ocx_[0-9a-f]{32}$/);
+      expect(missing.headers.get(SESSION_HEADER)).not.toBe(first.headers.get(SESSION_HEADER));
       expect(overridden.headers.get(SESSION_HEADER)).toBe("operator-session");
       expect(provider.headers?.[SESSION_HEADER]).toBeUndefined();
     }
@@ -585,7 +587,7 @@ describe("OpenCode Zen Muse routing", () => {
         for (const request of [first, continued, sibling, chat, claude]) {
           expect(request.url).toBe("https://opencode.ai/zen/v1/responses");
           expect(request.headers.get(SESSION_HEADER)).toMatch(/^ocx_[0-9a-f]{32}$/);
-          expect(request.headers.get("user-agent")).toBe("opencodex");
+          expect(request.headers.get("user-agent")).toBe(OPENCODE_ZEN_USER_AGENT);
           expect(request.headers.has("x-opencode-client")).toBe(false);
         }
         expect(continued.headers.get(SESSION_HEADER)).toBe(first.headers.get(SESSION_HEADER));
@@ -609,19 +611,25 @@ describe("OpenCode Zen Muse routing", () => {
     const continued = await captureRequest({ ...input, metadataUserId: "user_test_account__session_conversation-a" });
     const other = await captureRequest({ ...input, metadataUserId: "user_test_account__session_conversation-b" });
     const missing = await captureRequest(input);
+    const missingAgain = await captureRequest(input);
     expect(first.headers.get(SESSION_HEADER)).toMatch(/^ocx_[0-9a-f]{32}$/);
     expect(continued.headers.get(SESSION_HEADER)).toBe(first.headers.get(SESSION_HEADER));
     expect(other.headers.get(SESSION_HEADER)).not.toBe(first.headers.get(SESSION_HEADER));
-    expect(missing.headers.has(SESSION_HEADER)).toBe(false);
+    // Zen now refuses free-model requests without a session, so a sessionless request gets a
+    // per-request lane instead of joining another conversation.
+    expect(missing.headers.get(SESSION_HEADER)).toMatch(/^ocx_[0-9a-f]{32}$/);
+    expect(missing.headers.get(SESSION_HEADER)).not.toBe(first.headers.get(SESSION_HEADER));
+    expect(missingAgain.headers.get(SESSION_HEADER)).not.toBe(missing.headers.get(SESSION_HEADER));
   });
 
-  test("Zen keeps explicit operator overrides and omits absent client identity", async () => {
+  test("Zen keeps explicit operator overrides and allocates a lane for absent client identity", async () => {
     const input = { providerName: "opencode-zen", model: "muse-spark-1.3-contributor-free" };
     const explicit = await captureRequest({ ...input, provider: zen("opencode-zen", { headers: { "X-OpenCode-Session": "operator-session", "User-Agent": "my-client" } }) });
     expect(explicit.headers.get(SESSION_HEADER)).toBe("operator-session");
     expect(explicit.headers.get("user-agent")).toBe("my-client");
     const missing = await captureRequest({ ...input, provider: zen(), headers: { "content-type": "application/json" } });
-    expect(missing.headers.has(SESSION_HEADER)).toBe(false);
+    expect(missing.headers.get(SESSION_HEADER)).toMatch(/^ocx_[0-9a-f]{32}$/);
+    expect(missing.headers.get("user-agent")).toBe(OPENCODE_ZEN_USER_AGENT);
   });
 
   test("Zen wire defaults preserve explicit overrides, sibling models, and custom destinations", () => {

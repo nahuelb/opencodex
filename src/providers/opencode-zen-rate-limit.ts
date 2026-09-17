@@ -8,10 +8,11 @@
  * present they still take precedence. Distinct from the keyless desktop
  * ~200 requests / 5h quota documented on `opencode-free`.
  *
- * The same module also owns the keyless free-tier admission explanation (#4121):
- * Zen rejects a request that carries no `x-opencode-session` header with
- * `MissingSessionID` / "OpenCode's free tier can only be used in OpenCode".
- * Stable conversation identity supplies that header at route time.
+ * The same module also owns the free-tier admission explanation (#4121):
+ * Zen rejects a free-model request without `x-opencode-session` or without an
+ * `opencode/<version>` User-Agent token with `MissingSessionID` / `FreeTierError`
+ * ("OpenCode's free tier can only be used from within OpenCode"). The registry
+ * User-Agent and route-time session identity supply both.
  */
 import { validateClientRetryAfterHeader } from "../lib/retry-after";
 import { registryEntryForProviderDestination } from "./registry";
@@ -106,7 +107,7 @@ export function enrichOpenCodeZenRateLimitMessage(
   );
 }
 
-const OPENCODE_ZEN_FREE_TIER_LOCK_IN = /MissingSessionID|free tier can only be used in OpenCode/i;
+const OPENCODE_ZEN_FREE_TIER_LOCK_IN = /MissingSessionID|FreeTierError|free tier can only be used (?:from within|in) OpenCode/i;
 
 /** Idempotence marker — the appended guidance must not stack across enrichment layers. */
 const FREE_TIER_ENRICHMENT_MARKER = "requires a stable conversation session";
@@ -138,11 +139,13 @@ export function enrichOpenCodeZenFreeTierMessage(
   return (
     `${message}`
     + ` OpenCode Zen ${FREE_TIER_ENRICHMENT_MARKER}.`
-    + " OpenCodex derives x-opencode-session from the client's conversation ID."
+    + " OpenCodex derives x-opencode-session from the client's conversation ID and sends"
+    + " the opencode/<version> User-Agent token Zen requires for free models."
     + " Preserve a stable session-id, thread-id, or x-opencode-session across turns;"
     + " use distinct IDs for separate conversations. Adding an opencode-zen API key"
-    + " alone does not fix missing session identity. If the error persists, check"
-    + " model and account availability at https://opencode.ai/auth."
+    + " alone does not fix missing session identity, and a provider User-Agent override"
+    + " must keep that token. If the error persists, check model and account"
+    + " availability at https://opencode.ai/auth."
     + " Provider documentation: https://opencode.ai/docs/zen/."
   );
 }

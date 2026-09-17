@@ -341,9 +341,9 @@ des indications propres au fournisseur ainsi qu'un `Retry-After` synthétique ; 
 reste prioritaire. L'attente et la nouvelle tentative avec la même clé restent facultatives et s'activent avec
 [`retryOn429`](/fr/reference/configuration/).
 
-**Muse Spark sur Zen utilise `/zen/v1/responses`.** Cela couvre les versions 1.3 et 1.2, y compris `-contributor-free`. Les préréglages `opencode-zen` et `opencode-free` s’identifient comme `opencodex` et dérivent un en-tête opaque `x-opencode-session` de l’identifiant de conversation. Sa valeur reste stable entre les tours et distingue les conversations. Un en-tête configuré explicitement reste prioritaire.
+**Muse Spark sur Zen utilise `/zen/v1/responses`.** Cela couvre les versions 1.3 et 1.2, y compris `-contributor-free`. Les préréglages `opencode-zen` et `opencode-free` envoient le User-Agent `opencodex opencode/<version>` exigé par Zen pour les modèles gratuits et dérivent un en-tête opaque `x-opencode-session` de l’identifiant de conversation. Sa valeur reste stable entre les tours et distingue les conversations. Un en-tête configuré explicitement reste prioritaire.
 
-Le client doit fournir `thread-id`, `session-id`, `x-opencode-session` ou, pour Claude Code, `metadata.user_id`. Sans identité de session, Zen peut répondre `MissingSessionID`. Ajouter une clé seule ne corrige pas cette erreur. Un test avec une clé Zen et le modèle gratuit Muse Spark 1.3 a abouti ; l’accès sans clé et la disponibilité restent contrôlés par [OpenCode Zen](https://opencode.ai/docs/zen/).
+Le client doit fournir `thread-id`, `session-id`, `x-opencode-session` ou, pour Claude Code, `metadata.user_id`. Sans identité de session, OpenCodex attribue une valeur de session propre à cette requête. Si la session ou le jeton User-Agent manque, Zen répond `MissingSessionID` ou `FreeTierError`. Ajouter une clé seule ne corrige pas cette erreur. Un test avec une clé Zen et le modèle gratuit Muse Spark 1.3 a abouti ; l’accès sans clé et la disponibilité restent contrôlés par [OpenCode Zen](https://opencode.ai/docs/zen/).
 
 La plupart utilisent l'adaptateur `openai-chat` avec une clé Bearer ; quelques fournisseurs qui n'exposent
 qu'un point de terminaison compatible Anthropic, comme **Xiaomi MiMo**, emploient l'adaptateur `anthropic`

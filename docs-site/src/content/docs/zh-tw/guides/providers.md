@@ -297,9 +297,9 @@ IDE／CLI，不透過 API；`minimax/minimax-m2.5` 是文件列出的 API 免費
 error 加入 provider guidance 與 synthetic `Retry-After`；若上游有 `Retry-After`，仍以上游值為準。
 same-key wait-and-retry 仍需透過 [`retryOn429`](/zh-tw/reference/configuration/) 明確 opt-in。
 
-**Zen 的 Muse Spark 使用 `/zen/v1/responses`。** 這包含 1.3、1.2 及其 `-contributor-free` 版本。`opencode-zen` 和 `opencode-free` 以 `opencodex` 識別自己，並由對話 ID 衍生不透明的 `x-opencode-session` 標頭。同一對話維持穩定，不同對話相互分離。明確設定的供應商標頭優先。
+**Zen 的 Muse Spark 使用 `/zen/v1/responses`。** 這包含 1.3、1.2 及其 `-contributor-free` 版本。`opencode-zen` 和 `opencode-free` 傳送 Zen 免費模型所需的 User-Agent `opencodex opencode/<version>`，並由對話 ID 衍生不透明的 `x-opencode-session` 標頭。同一對話維持穩定，不同對話相互分離。明確設定的供應商標頭優先。
 
-用戶端必須提供 `thread-id`、`session-id`、`x-opencode-session`，或 Claude Code 的 `metadata.user_id`。缺少對話識別時，Zen 可能回傳 `MissingSessionID`。只新增 API 金鑰無法解決此問題。已使用 Zen 金鑰驗證免費 Muse Spark 1.3 能完成回應；免金鑰存取及模型可用性仍由 [OpenCode Zen](https://opencode.ai/docs/zen/) 決定。
+用戶端必須提供 `thread-id`、`session-id`、`x-opencode-session`，或 Claude Code 的 `metadata.user_id`。缺少對話識別時，OpenCodex 只為該請求配置一個工作階段值。缺少工作階段或 User-Agent 權杖時，Zen 會回傳 `MissingSessionID` 或 `FreeTierError`。只新增 API 金鑰無法解決此問題。已使用 Zen 金鑰驗證免費 Muse Spark 1.3 能完成回應；免金鑰存取及模型可用性仍由 [OpenCode Zen](https://opencode.ai/docs/zen/) 決定。
 
 大多數 provider 使用帶 bearer key 的 `openai-chat` adapter；少數只提供 Anthropic-compatible endpoint 的
 provider，例如 **Xiaomi MiMo**，使用 `anthropic` adapter（`x-api-key`）。Volcengine Agent Plan 透過

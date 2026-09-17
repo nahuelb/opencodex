@@ -54,6 +54,7 @@ import { resolveWireProtocolOverride } from "../../src/server/adapter-resolve";
 import { removeTreeWithRetry } from "../helpers/remove-tree";
 import { clearProviderQuotaCache, fetchProviderQuotaReports, setProviderQuotaBeforePublishForTests } from "../../src/providers/quota";
 import { setCachedProviderQuotaForTests } from "../../src/providers/quota-routing-cache";
+import { OPENCODE_ZEN_USER_AGENT } from "../../src/providers/registry/opencode-headers";
 
 // Full-suite Windows load: startServer + multi-step provider PATCH/GET flows exceed the
 // default 5s per-test budget (same flake class as 810fa115 / claude-management-api).
@@ -4582,11 +4583,11 @@ describe("provider management validation", () => {
     // relies on.
     expect((await patch("opencode-free", { headers: null }))?.status).toBe(200);
     expect(liveConfig.providers["opencode-free"].headers).toEqual({
-      "User-Agent": "opencodex",
+      "User-Agent": OPENCODE_ZEN_USER_AGENT,
     });
     const saved = JSON.parse(readFileSync(join(TEST_DIR, "config.json"), "utf8")) as OcxConfig;
     expect(saved.providers["opencode-free"]?.headers).toEqual({
-      "User-Agent": "opencodex",
+      "User-Agent": OPENCODE_ZEN_USER_AGENT,
     });
   });
   test("concurrent provider PATCHes serialize mixed fields and per-model soft budgets", async () => {

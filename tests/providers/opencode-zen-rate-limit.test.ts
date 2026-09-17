@@ -145,6 +145,8 @@ describe("opencode-zen rate-limit guidance (#1145)", () => {
 describe("opencode-free keyless tier lock-in (#4121)", () => {
   /** Verbatim upstream body from the issue, as the Responses wire forwards it. */
   const RAW_UPSTREAM = String.raw`{"type":"error","error":{"type":"MissingSessionID","message":"Error from provider (Console): OpenCode's free tier can only be used in OpenCode"}}`;
+  /** Body Zen returns since 2026-09-16 when the User-Agent lacks the opencode/<version> token. */
+  const RAW_FREE_TIER_UPSTREAM = String.raw`{"type":"error","error":{"type":"FreeTierError","message":"Error from provider (Console): OpenCode's free tier can only be used from within OpenCode"}}`;
   const FREE_TIER_ROUTE = {
     providerName: "opencode-free",
     baseUrl: "https://opencode.ai/zen/v1",
@@ -172,6 +174,11 @@ describe("opencode-free keyless tier lock-in (#4121)", () => {
     expect(isOpenCodeZenFreeTierLockIn(
       "Provider error 400: OpenCode's free tier can only be used in OpenCode",
     )).toBe(true);
+    expect(isOpenCodeZenFreeTierLockIn(RAW_FREE_TIER_UPSTREAM)).toBe(true);
+    expect(isOpenCodeZenFreeTierLockIn(
+      "Provider error 403: Error from provider (Console)",
+      "FreeTierError",
+    )).toBe(true);
     expect(isOpenCodeZenFreeTierLockIn("Provider error 500: boom")).toBe(false);
     expect(isOpenCodeZenFreeTierLockIn("Provider error 500: boom", "server_error")).toBe(false);
   });
@@ -187,6 +194,9 @@ describe("opencode-free keyless tier lock-in (#4121)", () => {
     expect(enriched).toContain("https://opencode.ai/docs/zen/");
     expect(enriched).toContain("requires a stable conversation session");
     expect(enriched).toContain("alone does not fix missing session identity");
+    expect(enriched).toContain("opencode/<version> User-Agent");
+    const freeTier = enrichOpenCodeZenFreeTierMessage(`Provider error 403: ${RAW_FREE_TIER_UPSTREAM}`, FREE_TIER_ROUTE);
+    expect(freeTier).toContain("requires a stable conversation session");
   });
 
   test("enrichment is scoped to Zen destinations and to this error", () => {

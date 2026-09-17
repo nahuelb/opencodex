@@ -226,9 +226,9 @@ Cline IDE/CLI 中提供，不能通过 API 使用；`minimax/minimax-m2.5` 是�
 **OpenCode Zen**（`opencode-zen`）与免密钥的 **OpenCode Free** 预设共用
 `https://opencode.ai/zen/v1`。该网关上的免费模型常会触发约每分钟 15–20 次请求的短窗口限流（社区观测；OpenCode 未公布 RPM）。Zen 可能返回不带 `Retry-After` / `X-RateLimit-*` 的通用 429。这与免密钥桌面配额（`opencode-free` 上约每 5 小时 200 次 Big Pickle/免费模型请求）是分开的。当这类 429 省略 `Retry-After` 时，opencodex 会在客户端错误中补充说明并附带合成的 `Retry-After`；若上游已提供 `Retry-After`，则仍以它为准。同密钥等待重试仍可通过 [`retryOn429`](/zh-cn/reference/configuration/) 选择开启。
 
-**Zen 上的 Muse Spark 使用 `/zen/v1/responses`。** 这包括 1.3、1.2 及其 `-contributor-free` 版本。`opencode-zen` 和 `opencode-free` 以 `opencodex` 标识自身，并从会话 ID 派生不透明的 `x-opencode-session` 头。同一会话保持稳定，不同会话相互分离。显式配置的提供商头优先。
+**Zen 上的 Muse Spark 使用 `/zen/v1/responses`。** 这包括 1.3、1.2 及其 `-contributor-free` 版本。`opencode-zen` 和 `opencode-free` 发送 Zen 免费模型所需的 User-Agent `opencodex opencode/<version>`，并从会话 ID 派生不透明的 `x-opencode-session` 头。同一会话保持稳定，不同会话相互分离。显式配置的提供商头优先。
 
-客户端必须提供 `thread-id`、`session-id`、`x-opencode-session`，或 Claude Code 的 `metadata.user_id`。缺少会话标识时，Zen 可能返回 `MissingSessionID`。仅添加 API 密钥不能解决此问题。已使用 Zen 密钥验证免费 Muse Spark 1.3 能完成响应；免密钥访问及模型可用性仍由 [OpenCode Zen](https://opencode.ai/docs/zen/) 决定。
+客户端必须提供 `thread-id`、`session-id`、`x-opencode-session`，或 Claude Code 的 `metadata.user_id`。缺少会话标识时，OpenCodex 只为该请求分配一个会话值。缺少会话或 User-Agent 令牌时，Zen 会返回 `MissingSessionID` 或 `FreeTierError`。仅添加 API 密钥不能解决此问题。已使用 Zen 密钥验证免费 Muse Spark 1.3 能完成响应；免密钥访问及模型可用性仍由 [OpenCode Zen](https://opencode.ai/docs/zen/) 决定。
 
 大多数使用带 bearer 密钥的 `openai-chat` adapter；少数仅暴露 Anthropic 兼容端点的提供商（例如 **Xiaomi MiMo**）使用 `anthropic` adapter（`x-api-key`）。
 火山方舟 Agent Plan 通过 `openai-responses` adapter 使用原生 Responses 端点。

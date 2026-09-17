@@ -234,9 +234,9 @@ Cline IDE/CLI에서만 제공되며 API로는 사용할 수 없습니다. `minim
 **OpenCode Zen**(`opencode-zen`)과 키 없는 **OpenCode Free** 프리셋은
 `https://opencode.ai/zen/v1`을 공유합니다. 그 게이트웨이의 무료 모델은 종종 분당 약 15–20회 요청의 짧은 창 속도 제한에 걸립니다(커뮤니티 측정; OpenCode는 RPM을 공개하지 않음). Zen은 `Retry-After` / `X-RateLimit-*` 헤더 없는 일반 429를 반환할 수 있습니다. 이는 키 없는 데스크톱 할당량(`opencode-free`에서 약 5시간당 Big Pickle/무료 모델 200회)과 별개입니다. Zen이 그런 429에서 `Retry-After`를 생략하면 opencodex는 클라이언트 오류에 안내를 더하고 합성 `Retry-After`를 붙입니다(업스트림 `Retry-After`가 있으면 그것이 우선). 동일 키 대기 재시도는 [`retryOn429`](/ko/reference/configuration/)로 선택합니다.
 
-**Zen의 Muse Spark는 `/zen/v1/responses`를 사용합니다.** 1.3과 1.2 및 `-contributor-free` 모델에 적용됩니다. `opencode-zen`과 `opencode-free`는 자신을 `opencodex`로 식별하고 대화 ID에서 불투명한 `x-opencode-session` 헤더를 생성합니다. 같은 대화에서는 값을 유지하고 다른 대화와는 분리합니다. 명시적으로 설정한 공급자 헤더가 우선합니다.
+**Zen의 Muse Spark는 `/zen/v1/responses`를 사용합니다.** 1.3과 1.2 및 `-contributor-free` 모델에 적용됩니다. `opencode-zen`과 `opencode-free`는 Zen 무료 모델에 필요한 User-Agent `opencodex opencode/<version>`를 보내고 대화 ID에서 불투명한 `x-opencode-session` 헤더를 생성합니다. 같은 대화에서는 값을 유지하고 다른 대화와는 분리합니다. 명시적으로 설정한 공급자 헤더가 우선합니다.
 
-클라이언트는 `thread-id`, `session-id`, `x-opencode-session` 또는 Claude Code의 `metadata.user_id`를 보내야 합니다. 세션 ID가 없으면 Zen이 `MissingSessionID`를 반환할 수 있습니다. API 키만 추가해서는 해결되지 않습니다. Zen 키로 무료 Muse Spark 1.3의 응답을 확인했지만, 키 없는 접근과 모델 제공 여부는 [OpenCode Zen](https://opencode.ai/docs/zen/)이 관리합니다.
+클라이언트는 `thread-id`, `session-id`, `x-opencode-session` 또는 Claude Code의 `metadata.user_id`를 보내야 합니다. 세션 ID가 없으면 OpenCodex가 해당 요청에만 쓰는 세션 값을 할당합니다. 세션이나 User-Agent 토큰이 없으면 Zen이 `MissingSessionID` 또는 `FreeTierError`를 반환합니다. API 키만 추가해서는 해결되지 않습니다. Zen 키로 무료 Muse Spark 1.3의 응답을 확인했지만, 키 없는 접근과 모델 제공 여부는 [OpenCode Zen](https://opencode.ai/docs/zen/)이 관리합니다.
 
 대부분은 bearer 키와 함께 `openai-chat` 어댑터를 사용하며, Anthropic 호환 엔드포인트만 노출하는 일부
 (예: **Xiaomi MiMo**)는 `anthropic` 어댑터(`x-api-key`)를 사용합니다.

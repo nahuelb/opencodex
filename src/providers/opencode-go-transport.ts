@@ -4,6 +4,7 @@ import { registryEntryForProviderDestination } from "./registry";
 
 export const OPENCODE_SESSION_HEADER = "x-opencode-session";
 export const OPENCODE_GO_SESSION_HEADER = OPENCODE_SESSION_HEADER;
+export { OPENCODE_CLIENT_USER_AGENT_TOKEN, OPENCODE_ZEN_USER_AGENT } from "./registry/opencode-headers";
 
 function hasHeaderCaseInsensitive(
   headers: Record<string, string> | undefined,
@@ -32,10 +33,9 @@ export function openCodeSessionProviderId(provider: OcxProviderConfig): string |
 }
 
 /**
- * Add affinity only to canonical fixed-key OpenCode destinations. Go requires a session on every
- * request, so it falls back to the caller's request-scoped lane, which stays stable across retries.
- * Zen accepts requests without one, so it uses real conversation identity only and otherwise omits
- * the header rather than grouping unrelated requests.
+ * Add affinity only to canonical fixed-key OpenCode destinations. Go and Zen both require a session
+ * on every request, so a sessionless caller falls back to its request-scoped lane, which stays
+ * stable across retries without grouping unrelated requests.
  */
 export function resolveOpenCodeTransport<T extends OcxProviderConfig>(
   provider: T,
@@ -44,7 +44,7 @@ export function resolveOpenCodeTransport<T extends OcxProviderConfig>(
 ): T {
   const providerId = openCodeSessionProviderId(provider);
   if (!providerId) return provider;
-  const lane = providerId === "opencode-go" ? sessionLane ?? allocatedSessionLane : sessionLane;
+  const lane = sessionLane ?? allocatedSessionLane;
   if (!lane) return provider;
   if (hasHeaderCaseInsensitive(provider.headers, OPENCODE_SESSION_HEADER)) return provider;
 

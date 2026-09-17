@@ -383,9 +383,9 @@ ekler; bir yukarı akış `Retry-After`'ı yine de önceliklidir. Aynı anahtarl
 bekle ve yeniden dene özelliği [`retryOn429`](/tr/reference/configuration/)
 aracılığıyla isteğe bağlı kalır.
 
-**Zen üzerindeki Muse Spark, `/zen/v1/responses` kullanır.** Bu, 1.3 ve 1.2 ile `-contributor-free` sürümlerini kapsar. `opencode-zen` ve `opencode-free`, kendilerini `opencodex` olarak tanıtır ve konuşma kimliğinden opak bir `x-opencode-session` başlığı türetir. Değer aynı konuşmada sabit kalır ve farklı konuşmaları ayırır. Açıkça ayarlanmış sağlayıcı başlığı önceliklidir.
+**Zen üzerindeki Muse Spark, `/zen/v1/responses` kullanır.** Bu, 1.3 ve 1.2 ile `-contributor-free` sürümlerini kapsar. `opencode-zen` ve `opencode-free`, Zen'in ücretsiz modeller için istediği `opencodex opencode/<version>` User-Agent değerini gönderir ve konuşma kimliğinden opak bir `x-opencode-session` başlığı türetir. Değer aynı konuşmada sabit kalır ve farklı konuşmaları ayırır. Açıkça ayarlanmış sağlayıcı başlığı önceliklidir.
 
-İstemci `thread-id`, `session-id`, `x-opencode-session` veya Claude Code için `metadata.user_id` göndermelidir. Oturum kimliği yoksa Zen, `MissingSessionID` döndürebilir. Yalnızca API anahtarı eklemek bu hatayı çözmez. Zen anahtarıyla ücretsiz Muse Spark 1.3 yanıtı doğrulandı; anahtarsız erişimi ve model kullanılabilirliğini [OpenCode Zen](https://opencode.ai/docs/zen/) belirler.
+İstemci `thread-id`, `session-id`, `x-opencode-session` veya Claude Code için `metadata.user_id` göndermelidir. Oturum kimliği yoksa OpenCodex yalnızca o istek için bir oturum değeri atar. Oturum veya User-Agent belirteci eksikse Zen, `MissingSessionID` veya `FreeTierError` döndürür. Yalnızca API anahtarı eklemek bu hatayı çözmez. Zen anahtarıyla ücretsiz Muse Spark 1.3 yanıtı doğrulandı; anahtarsız erişimi ve model kullanılabilirliğini [OpenCode Zen](https://opencode.ai/docs/zen/) belirler.
 
 Çoğu bir taşıyıcı anahtarla `openai-chat` adaptörünü kullanır; yalnızca
 Anthropic uyumlu bir uç nokta sunan birkaç tanesi (örneğin **Xiaomi MiMo**)

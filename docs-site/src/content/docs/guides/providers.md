@@ -510,10 +510,12 @@ routes. These limits and the endpoint are published in
 
 **Muse Spark on Zen uses the Responses endpoint.** OpenCodex routes Muse Spark 1.3 and 1.2,
 including their `-contributor-free` variants, through `/zen/v1/responses`. Other models retain
-their existing routes. The `opencode-zen` and `opencode-free` presets identify the proxy as
-`opencodex` and derive an opaque `x-opencode-session` header from the client's conversation ID.
-The value stays stable across turns and differs between conversations and sibling subagents.
-An explicit provider session header takes precedence.
+their existing routes. The `opencode-zen` and `opencode-free` presets send the User-Agent
+`opencodex opencode/<version>`, because since 2026-09-16 Zen admits free models only when the
+User-Agent carries an `opencode/<version>` token, and derive an opaque `x-opencode-session`
+header from the client's conversation ID. The value stays stable across turns and differs
+between conversations and sibling subagents. An explicit provider session header takes
+precedence, and a provider User-Agent override replaces the registry value entirely.
 
 These Muse models offer exactly `minimal`, `low`, `medium`, `high`, and `xhigh` in the Codex
 picker on `opencode-zen` and `opencode-free`. Go's Muse 1.3/1.2 contributor models use the
@@ -521,14 +523,16 @@ same ladder. OpenCodex sends each supported label unchanged as `reasoning.effort
 not add `max` or `ultra` picker options for these models. Older requests with those values
 map to `xhigh`. No default override is added; the picker still defaults to `medium`.
 
-Clients must send a stable session identity, such as `thread-id`, `session-id`, or
+Clients should send a stable session identity, such as `thread-id`, `session-id`, or
 `x-opencode-session`; Claude Code can supply it through `metadata.user_id`. Without one,
-OpenCodex leaves the session header absent. Zen can then return `MissingSessionID` with
-"OpenCode's free tier can only be used in OpenCode". Adding an API key alone does not fix that
-error. OpenCodex does not claim to be the OpenCode client.
+OpenCodex allocates a session value for that request alone, so unrelated requests never share
+a conversation. Zen returns `MissingSessionID` or `FreeTierError` with "OpenCode's free tier
+can only be used from within OpenCode" when either the session header or the User-Agent token is
+missing, for example after a User-Agent override without the token. Adding an API key alone does
+not fix that error.
 
 A live check of `muse-spark-1.3-contributor-free` with a Zen key completed through Responses
-using OpenCodex's own identity and a conversation session header. This does not guarantee
+using this User-Agent and a conversation session header. This does not guarantee
 keyless access or availability for every account. Obtain a Zen key at
 [opencode.ai/auth](https://opencode.ai/auth); model access and quotas remain controlled by
 [OpenCode Zen](https://opencode.ai/docs/zen/).

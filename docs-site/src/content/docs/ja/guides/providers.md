@@ -235,9 +235,9 @@ Cline IDE/CLI のみで API からは使えません。`minimax/minimax-m2.5` �
 **OpenCode Zen**（`opencode-zen`）とキー不要の **OpenCode Free** プリセットは
 `https://opencode.ai/zen/v1` を共有します。このゲートウェイ上の無料モデルは、しばしばおおよそ毎分 15–20 リクエストの短時間レート制限に当たります（コミュニティ計測。OpenCode は RPM を公表しません）。Zen は `Retry-After` / `X-RateLimit-*` ヘッダーなしの汎用 429 を返すことがあります。これはキー不要デスクトップ枠（`opencode-free` で Big Pickle/無料モデル約 200 回 / 5 時間）とは別です。Zen がそのような 429 で `Retry-After` を省略した場合、opencodex はクライアント向けエラーに案内を足し、合成 `Retry-After` を付けます（上流の `Retry-After` があればそれが優先されます）。同一キーの待機再試行は [`retryOn429`](/ja/reference/configuration/) でオプトインします。
 
-**Zen の Muse Spark は `/zen/v1/responses` を使用します。** 1.3 と 1.2、および `-contributor-free` が対象です。`opencode-zen` と `opencode-free` は `opencodex` として識別し、会話 ID から不透明な `x-opencode-session` ヘッダーを生成します。同じ会話では値を維持し、別の会話では分離します。明示的なプロバイダーヘッダーが優先されます。
+**Zen の Muse Spark は `/zen/v1/responses` を使用します。** 1.3 と 1.2、および `-contributor-free` が対象です。`opencode-zen` と `opencode-free` は Zen の無料モデルに必要な User-Agent `opencodex opencode/<version>` を送信し、会話 ID から不透明な `x-opencode-session` ヘッダーを生成します。同じ会話では値を維持し、別の会話では分離します。明示的なプロバイダーヘッダーが優先されます。
 
-クライアントは `thread-id`、`session-id`、`x-opencode-session`、または Claude Code の `metadata.user_id` を送信する必要があります。会話 ID がない場合、Zen は `MissingSessionID` を返すことがあります。API キーの追加だけでは解決しません。Zen キーを使用した無料の Muse Spark 1.3 の動作は確認済みですが、キー不要のアクセスや提供状況は [OpenCode Zen](https://opencode.ai/docs/zen/) が管理します。
+クライアントは `thread-id`、`session-id`、`x-opencode-session`、または Claude Code の `metadata.user_id` を送信する必要があります。会話 ID がない場合、OpenCodex はそのリクエストだけのセッション値を割り当てます。セッションまたは User-Agent トークンがない場合、Zen は `MissingSessionID` または `FreeTierError` を返します。API キーの追加だけでは解決しません。Zen キーを使用した無料の Muse Spark 1.3 の動作は確認済みですが、キー不要のアクセスや提供状況は [OpenCode Zen](https://opencode.ai/docs/zen/) が管理します。
 
 大半は bearer キーと共に `openai-chat` アダプターを使い、Anthropic 互換エンドポイントのみを公開する一部
 (例: **Xiaomi MiMo**)は `anthropic` アダプター(`x-api-key`)を使います。
