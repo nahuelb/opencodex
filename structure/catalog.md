@@ -1,6 +1,9 @@
 # Model Catalog
 
 Desktop tool-description extraction follows the [tool-reference history contract](runtime.md#desktop-tool-reference-history).
+Native result continuations and function-result injection follow [the mode-specific result and control contract](transports/streaming-health.md#experimental-native-function-result-injection); this surface does not infer upstream support or alter its defaults.
+
+Native steering follows [the shared WebSocket contract](transports/streaming-health.md#experimental-native-mid-turn-steering); this surface's defaults remain unchanged.
 
 Catalog discovery remains separate from the Responses final-route
 [core module ownership](transports/responses.md#core-module-ownership). This surface retains its existing behavior.
@@ -181,6 +184,10 @@ the canonical `provider/model`. Its display name uses the provider's exact `mode
 then trusted catalog metadata such as a configured qualified provider/model alias, then the public slug.
 This overlay never changes route identity or the upstream wire model, and its catalog fingerprint makes
 a label edit refresh Codex output.
+
+Raw `/v1/models` rows advertise positive safe capacity values in both Cursor's nested
+`capabilities` object and top-level discovery fields used by other clients. A model with a larger
+opt-in context tier uses that effective long window in both shapes; invalid values are omitted.
 
 Supported bare native GPT rows also consume `providers.openai.modelDisplayNames`. Retained sync
 and convergence pass the same map to the observed-state merge. After native normalization and
@@ -439,3 +446,6 @@ Shared response-log retention and native SSE inspection pacing follow the [bound
 
 Manual compaction selects its configured model at Responses ingress under the
 [manual compaction contract](transports/responses.md#manual-compaction-overrides). Catalog selection remains conversation-owned.
+Native steering retains fixed phase deadlines and reconciled replay output; see the [steering stability contract](transports/streaming-health.md#steering-deadlines-and-replay-completeness).
+
+Native steering generation overrides, explicit public-API eligibility and the consent-gated wire probe follow the [shared control contract](transports/streaming-health.md#steering-settings-public-api-and-diagnostic-probe); this owner does not change routing or execute diagnostic tools.

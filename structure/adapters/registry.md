@@ -1,5 +1,9 @@
 # Adapter Registry Authority
 
+Native result continuations and function-result injection follow [the mode-specific result and control contract](../transports/streaming-health.md#experimental-native-function-result-injection); this surface does not infer upstream support or alter its defaults.
+
+Native steering follows [the shared WebSocket contract](../transports/streaming-health.md#experimental-native-mid-turn-steering); this surface's defaults remain unchanged.
+
 Request-local adapter bindings are separate from registry authority in the Responses
 [core module ownership](../transports/responses.md#core-module-ownership). This surface retains its existing behavior.
 
@@ -217,3 +221,6 @@ snapshot carries the complete baseline and effort-update history. This is prepar
 state, not proof of a completed request or an upstream cache hit. Focused coverage is
 in `tests/adapters/anthropic/anthropic-side-chat-cache.test.ts` and
 `tests/adapters/anthropic/anthropic-effort-cache.test.ts`.
+Native steering retains fixed phase deadlines and reconciled replay output; see the [steering stability contract](../transports/streaming-health.md#steering-deadlines-and-replay-completeness).
+
+Native steering generation overrides, explicit public-API eligibility and the consent-gated wire probe follow the [shared control contract](../transports/streaming-health.md#steering-settings-public-api-and-diagnostic-probe); this owner does not change routing or execute diagnostic tools.

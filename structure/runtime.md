@@ -2,6 +2,9 @@
 
 Manual Codex compaction uses a request-local model override when configured; the
 [Responses compaction contract](transports/responses.md#manual-compaction-overrides) owns its trigger and replay boundaries.
+Native result continuations and function-result injection follow [the mode-specific result and control contract](transports/streaming-health.md#experimental-native-function-result-injection); this surface does not infer upstream support or alter its defaults.
+
+Native steering follows [the shared WebSocket contract](transports/streaming-health.md#experimental-native-mid-turn-steering); this surface's defaults remain unchanged.
 
 Responses admission and finalization are composed through the
 [core module ownership](transports/responses.md#core-module-ownership). This surface retains its existing behavior.
@@ -44,6 +47,14 @@ not commit history, so continuity across their replayed output is not guaranteed
 
 `tests/codex-integration/codex-side-chat-cache.test.ts` checks complete input-prefix
 continuity, replacement lists, fork boundaries, limits, and mutation isolation.
+## Anthropic streaming usage snapshots
+
+`src/claude/outbound.ts` starts Anthropic semantic framing lazily. When `response.created` or
+`response.in_progress` reports numeric input usage before the first content event, `message_start`
+uses that confirmed value through the normal Anthropic cache-token transform. Without an early
+measurement it emits the required zero snapshot without estimating or delaying content. The terminal
+`message_delta.usage` remains cumulative and is always derived from the terminal response usage;
+this wire projection does not change the usage ledger.
 
 ## CLI readiness diagnostics
 
@@ -84,7 +95,7 @@ The prefilter is only an optimization, not final process-membership authority.
 | `src/server/audio-live.ts`, `src/server/audio-dictation.ts` | External voice/dictation orchestration using the existing bounded socket relay, server-owned credentials, cancellation and opaque call ownership. See [streaming audio](data-planes/inbound-compat.md#streaming-audio). |
 | `src/config.ts` | Persisted `~/.opencodex/config.json` surface: the facade keeps the load/save/initialize entry points and re-exports, while schema lives in `src/config/schema/` (`config-schema.ts`, `leaf-validators.ts`), defaults in `src/config/proxy-env.ts`, and replace-path persistence in `src/config/persist-unlocked.ts`. |
 | `src/config/paths.ts` | Resolves `OPENCODEX_HOME`, `config.json`, and owner-only directory hardening. |
-| `src/config/atomic-write.ts` | Shared synchronous/asynchronous temp-harden-rename writer and residual-temp failure contract. |
+| `src/config/atomic-write.ts` | Shared synchronous/asynchronous temp-harden-rename writer and residual-temp failure contract. The temp is ACL-hardened before it holds a byte and again before the rename, both `required: true`; the second call is a memo hit rather than a second icacls sequence because the writer re-asserts descriptor/path identity after the content write and re-attributes the harden through `reattributeHardenedSecretPath`. Windows takes no `chmod` on that path — it sets the read-only attribute, not the DACL, and its ChangeTime bump is what used to retire the memo. |
 | `src/config/process-state.ts` | Owns `ocx.pid`, `runtime-port.json`, cheap liveness, full command-line identity verification, and snapshot-guarded cleanup. |
 | `src/server/ports.ts` | Owns bind availability and ephemeral-port selection. Temporary probes dispose accepted peers and wait for listener close before reporting success. |
 | `src/cli/status.ts` / `src/cli/status-probes.ts` | Status snapshot assembly and the shared read-only health/stale-process probes used by status and doctor. Probe evidence keeps recorded-port choice, before/after snapshots and per-call timer cleanup together. |
@@ -263,9 +274,10 @@ Custom providers keep the conventional `${baseUrl}/models` request, normalized b
 whitespace and trailing slashes are trimmed and an already-pasted `/models` is not doubled, so a
 `baseUrl` written with or without a trailing slash yields the identical discovery URL and an
 existing path prefix is preserved. Canonical presets may select a
-trusted URL/path/query and declarative eligibility filter without persisting that policy into user
-config. A response is rejected before caching when it exceeds 4 MiB, contains more than 2,000 raw
-rows, has a malformed OpenAI list envelope, or includes an invalid model id. Tests use fixtures and
+trusted URL/path/query, response envelope key, model identifier field, and declarative eligibility
+filter without persisting that policy into user config. A response is rejected before caching when
+it exceeds 4 MiB, contains more than 2,000 raw rows, has a malformed declared list envelope, or
+includes an invalid model id. Tests use fixtures and
 must never depend on live provider endpoints. Newly promoted fixed key presets opt into
 `preserveCustomDestination`, so an older same-named custom provider keeps its configured adapter,
 destination, and key boundary instead of being silently canonicalized onto the new host. Fixed
@@ -388,6 +400,11 @@ provider name for that assessment, so `planPassthroughWebSearchBridge` takes it 
 readiness, then reads that runtime's effort ladder without persisting its selection. Rejected
 preferred candidates still fall back in priority order. General `ocx status` retains full runtime
 discovery and passes its resolved command into readiness, avoiding a second version probe without adding cache state.
+
+`ocx config show` stays outside that lifecycle path. `src/cli/config-command.ts` reads the validated
+config snapshot and the bounded service-token observation needed for its `_remoteHub` annotation;
+it does not import the connect command, inspect catalog readiness, acquire lifecycle locks, or run
+config/secret ACL hardening.
 
 `src/remote/protocol.ts` owns pure interval/feature negotiation. `src/remote/hub-state.ts` owns the `GET|HEAD /v1/hub-state` contract, its caps, and the parser both sides share. `src/client/hub-client.ts` owns bounded, schema-validated remote catalog consumption, hub-state reads, and key-id probes; `src/client/hub-state.ts` owns the resolution and the owner-stamped 0600 cache, and a failed read reports "unavailable" rather than degrading to the client's own local provider and login state. `src/client/hub-relay.ts` is a fixed-authority management relay with URL, header, body, redirect, and stream bounds. The public data listener remains the direct client→hub path; the loopback management ingress never serves data-plane routes.
 
@@ -553,3 +570,6 @@ defines identity, unknown records, and aggregation boundaries.
 
 Anthropic side-task tool-description replay and bounded effort-history retention follow
 the [adapter cache contract](adapters/registry.md#anthropic-side-task-descriptions-and-effort-history).
+Native steering retains fixed phase deadlines and reconciled replay output; see the [steering stability contract](transports/streaming-health.md#steering-deadlines-and-replay-completeness).
+
+Native steering generation overrides, explicit public-API eligibility and the consent-gated wire probe follow the [shared control contract](transports/streaming-health.md#steering-settings-public-api-and-diagnostic-probe); this owner does not change routing or execute diagnostic tools.

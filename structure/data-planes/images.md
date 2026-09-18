@@ -1,5 +1,9 @@
 # Images Data Plane
 
+Native result continuations and function-result injection follow [the mode-specific result and control contract](../transports/streaming-health.md#experimental-native-function-result-injection); this surface does not infer upstream support or alter its defaults.
+
+Native steering follows [the shared WebSocket contract](../transports/streaming-health.md#experimental-native-mid-turn-steering); this surface's defaults remain unchanged.
+
 Vision preprocessing and image/video/search execution use the Responses
 [core module ownership](../transports/responses.md#core-module-ownership). This surface retains its existing behavior.
 
@@ -126,3 +130,6 @@ Shared response-log retention and native SSE inspection pacing follow the [bound
 
 Image-bearing Codex history follows the selected model's existing compaction handling after a
 [manual compaction override](../transports/responses.md#manual-compaction-overrides).
+Native steering retains fixed phase deadlines and reconciled replay output; see the [steering stability contract](../transports/streaming-health.md#steering-deadlines-and-replay-completeness).
+
+Native steering generation overrides, explicit public-API eligibility and the consent-gated wire probe follow the [shared control contract](../transports/streaming-health.md#steering-settings-public-api-and-diagnostic-probe); this owner does not change routing or execute diagnostic tools.
