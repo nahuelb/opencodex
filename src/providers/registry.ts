@@ -7,7 +7,6 @@ import type {
 } from "./registry/types";
 import { PROVIDER_REGISTRY_CORE } from "./registry/entries-core";
 import { PROVIDER_REGISTRY_EXTENDED } from "./registry/entries-extended";
-import { OPENCODE_SUPERSEDED_USER_AGENTS } from "./registry/opencode-headers";
 
 export type {
   ProviderAuthKind,
@@ -65,23 +64,12 @@ export function mergeRegistryStaticHeaders(
 ): Record<string, string> | undefined {
   if (!staticHeaders) return userHeaders;
   if (!userHeaders) return { ...staticHeaders };
-  const merged: Record<string, string> = {};
-  const claimed = new Set<string>();
-  const replaced = new Set(Object.keys(staticHeaders).map(name => name.toLowerCase()));
-  for (const [name, value] of Object.entries(userHeaders)) {
-    if (replaced.has(name.toLowerCase()) && isSupersededStaticHeader(name, value)) continue;
-    merged[name] = value;
-    claimed.add(name.toLowerCase());
-  }
+  const claimed = new Set(Object.keys(userHeaders).map(name => name.toLowerCase()));
+  const merged: Record<string, string> = { ...userHeaders };
   for (const [name, value] of Object.entries(staticHeaders)) {
     if (!claimed.has(name.toLowerCase())) merged[name] = value;
   }
   return merged;
-}
-
-/** A persisted copy of a registry value the registry has since replaced is not a user override. */
-function isSupersededStaticHeader(name: string, value: string): boolean {
-  return name.toLowerCase() === "user-agent" && OPENCODE_SUPERSEDED_USER_AGENTS.has(value);
 }
 
 /** Whether this registry row's per-model service-tier evidence applies to one configured target. */

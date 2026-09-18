@@ -34,7 +34,7 @@ export interface ConsumedComboFailure {
 
 export interface HandleResponsesOptions {
   /** Internal Claude replay identity; consumed only by the final canonical Go transport. */
-  claudeGoAffinity?: { sessionLane?: string; explicitSessionLane?: string };
+  claudeGoAffinity?: { sessionLane?: string };
   /** Validated Claude metadata identity; projected only into final canonical attempt headers. */
   claudeNativeSessionId?: string;
   /** Original live policy owner; separate from caller-specific routing/sidecar snapshots. */

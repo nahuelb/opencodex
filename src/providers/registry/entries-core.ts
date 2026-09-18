@@ -706,8 +706,6 @@ export const PROVIDER_REGISTRY_CORE: readonly ProviderRegistryEntry[] = [
     },
     modelReasoningEfforts: {
       "gpt-5.6-luna": OPENAI_API_GPT56_REASONING_EFFORTS,
-      "muse-spark-1.3-contributor": META_MUSE_REASONING_EFFORTS,
-      "muse-spark-1.2-contributor": META_MUSE_REASONING_EFFORTS,
       "grok-4.6": ["low", "medium", "high", "xhigh"],
       "glm-5.3": ZAI_GLM_53_REASONING_EFFORTS,
       "glm-5.3-flash": ZAI_GLM_53_REASONING_EFFORTS,
@@ -725,8 +723,6 @@ export const PROVIDER_REGISTRY_CORE: readonly ProviderRegistryEntry[] = [
     // the thinking-toggle map is a REAL wire alias (effort -> enabled/disabled) and stays.
     modelReasoningEffortMap: {
       "kimi-k3": KIMI_CODING_K3_REASONING_EFFORT_MAP,
-      "muse-spark-1.3-contributor": META_MUSE_REASONING_EFFORT_MAP,
-      "muse-spark-1.2-contributor": META_MUSE_REASONING_EFFORT_MAP,
       ...Object.fromEntries(OPENCODE_GO_THINKING_TOGGLE_MODELS.map(id => [id, THINKING_TOGGLE_MAP])),
       ...Object.fromEntries(DEEPSEEK_GATEWAY_THINKING_MODELS.map(id => [id, deepseekReasoningMapFor(id)])),
     },

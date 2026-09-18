@@ -387,9 +387,5 @@ Provider-scoped approval reviewer settings are projected by the [catalog owner](
 
 Renamed fixed-key providers receive [missing reasoning metadata](catalog.md#renamed-destination-reasoning-metadata) during derivation; explicit per-model entries and provider defaults retain precedence.
 
-OpenCode Muse subagent picker rows retain the [declared five-effort ladder](catalog.md#opencode-muse-effort-ladders) through catalog sync.
-
-OpenCode Zen Anthropic destinations use the [shared conversation-affinity contract](transports/inventory.md#opencode-zen-anthropic-affinity).
-
 The [manual compaction override](transports/responses.md#manual-compaction-overrides) uses explicit request-kind and trigger metadata, independently of spawned-child markers.
 Shared response-log retention and native SSE inspection pacing follow the [bounded inspection contract](transports/byte-accounting.md#response-log-inspection); other subsystem behavior remains unchanged.

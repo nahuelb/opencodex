@@ -14,8 +14,8 @@ import type { RequestLogContext } from "../request-log";
 import type { HandleResponsesOptions } from "./core-options";
 import { prepareEffortNormalization } from "../effort-policy";
 import { providerModelResponsesUpstreamStreaming } from "../../providers/registry";
-import { resolveOpenCodeTransport } from "../../providers/opencode-go-transport";
-import { getOrAllocateRequestSessionLane, normalizeLogConversationId, sessionLaneIdFromRequest } from "../request-log-conversation";
+import { resolveOpenCodeGoTransport } from "../../providers/opencode-go-transport";
+import { getOrAllocateRequestSessionLane } from "../request-log-conversation";
 import { shouldPreparePlaintextV2AgentMessages } from "../../responses/plaintext-v2-agent-messages";
 import { isCanonicalOpenAiForwardProvider } from "../../providers/openai-tiers";
 import { applyOpenAiVirtualModel } from "../../providers/openai-virtual-models";
@@ -144,10 +144,7 @@ export async function applyFinalRouteRequestNormalization(args: {
 
   // Settle the wire once so logging, fast-mode, auth, and sidecars read the adapter
   // this request will actually use (#404).
-  route.provider = resolveOpenCodeTransport(route.provider,
-    args.claudeGoAffinity
-      ? args.claudeGoAffinity.explicitSessionLane
-      : sessionLaneIdFromRequest(req.headers) ?? normalizeLogConversationId(req.headers.get("x-opencode-session")),
+  route.provider = resolveOpenCodeGoTransport(route.provider,
     args.claudeGoAffinity ? args.claudeGoAffinity.sessionLane : getOrAllocateRequestSessionLane(req));
   route.provider = resolveWireProtocolOverride(route.providerName, route.modelId, route.provider, inboundWire);
   parsed._plaintextV2AgentMessages = shouldPreparePlaintextV2AgentMessages({

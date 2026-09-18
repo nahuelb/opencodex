@@ -527,9 +527,7 @@ Regression coverage: `tests/responses/responses-forward-prompt-envelope.test.ts`
 
 Cursor's Muse Spark 1.3 catalog, wire efforts, native image input, and price source follow the [Cursor catalog contract](providers/cursor.md#muse-spark-catalog).
 
-OpenCode Muse uses the [exact catalog ladder](catalog.md#opencode-muse-effort-ladders); Responses adapters publish [final wire-effort metadata](transports/responses.md#passthrough-effort-logging) per attempt.
-
-OpenCode Zen Anthropic destinations use the [shared conversation-affinity contract](transports/inventory.md#opencode-zen-anthropic-affinity).
+Responses adapters publish [final wire-effort metadata](transports/responses.md#passthrough-effort-logging) per attempt.
 
 ## Combo default effort precedence
 

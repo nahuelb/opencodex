@@ -2,9 +2,7 @@ import { createHash } from "node:crypto";
 import type { OcxProviderConfig } from "../types";
 import { registryEntryForProviderDestination } from "./registry";
 
-export const OPENCODE_SESSION_HEADER = "x-opencode-session";
-export const OPENCODE_GO_SESSION_HEADER = OPENCODE_SESSION_HEADER;
-export { OPENCODE_CLIENT_USER_AGENT_TOKEN, OPENCODE_ZEN_USER_AGENT } from "./registry/opencode-headers";
+export const OPENCODE_GO_SESSION_HEADER = "x-opencode-session";
 
 function hasHeaderCaseInsensitive(
   headers: Record<string, string> | undefined,
@@ -14,55 +12,38 @@ function hasHeaderCaseInsensitive(
   return Object.keys(headers ?? {}).some(key => key.toLowerCase() === target);
 }
 
-/** Zen's free-tier gate accepts only OpenCode-shaped session IDs: `ses_` plus 26 characters. */
-const OPENCODE_ZEN_SESSION_ID_LENGTH = 26;
-
-function deriveOpenCodeSessionId(sessionLane: string, providerId: string): string {
-  const digest = createHash("sha256")
-    .update(`opencodex/${providerId}/session/v1\0`)
-    .update(sessionLane)
-    .digest("hex");
-  return providerId === "opencode-zen"
-    ? `ses_${digest.slice(0, OPENCODE_ZEN_SESSION_ID_LENGTH)}`
-    : `ocx_${digest.slice(0, 32)}`;
-}
-
+/** Derive a provider-scoped opaque value without exposing Codex task or subagent ids. */
 export function deriveOpenCodeGoSessionId(sessionLane: string): string {
-  return deriveOpenCodeSessionId(sessionLane, "opencode-go");
-}
-
-export function deriveOpenCodeZenSessionId(sessionLane: string): string {
-  return deriveOpenCodeSessionId(sessionLane, "opencode-zen");
-}
-
-export function openCodeSessionProviderId(provider: OcxProviderConfig): string | undefined {
-  const id = registryEntryForProviderDestination(provider)?.id;
-  return id === "opencode-go" || id === "opencode-zen" ? id : undefined;
+  const digest = createHash("sha256")
+    .update("opencodex/opencode-go/session/v1\0")
+    .update(sessionLane)
+    .digest("hex")
+    .slice(0, 32);
+  return `ocx_${digest}`;
 }
 
 /**
- * Add affinity only to canonical fixed-key OpenCode destinations. Go and Zen both require a session
- * on every request, so a sessionless caller falls back to its request-scoped lane, which stays
- * stable across retries without grouping unrelated requests.
+ * Add Go affinity only to the canonical fixed-key destination.
+ *
+ * Callers on the request path resolve the lane with `getOrAllocateRequestSessionLane`, which returns
+ * real conversation identity when the client supplied it and a per-request value otherwise, so a
+ * request reaching this helper from the proxy always carries a lane. The `!sessionLane` guard stays
+ * for direct callers that have no request context; it is not a per-request identity of its own, and
+ * minting one here would hand each retry a different value.
  */
-export function resolveOpenCodeTransport<T extends OcxProviderConfig>(
+export function resolveOpenCodeGoTransport<T extends OcxProviderConfig>(
   provider: T,
   sessionLane: string | undefined,
-  allocatedSessionLane?: string,
 ): T {
-  const providerId = openCodeSessionProviderId(provider);
-  if (!providerId) return provider;
-  const lane = sessionLane ?? allocatedSessionLane;
-  if (!lane) return provider;
-  if (hasHeaderCaseInsensitive(provider.headers, OPENCODE_SESSION_HEADER)) return provider;
+  if (registryEntryForProviderDestination(provider)?.id !== "opencode-go") return provider;
+  if (!sessionLane) return provider;
+  if (hasHeaderCaseInsensitive(provider.headers, OPENCODE_GO_SESSION_HEADER)) return provider;
 
   return {
     ...provider,
     headers: {
       ...(provider.headers ?? {}),
-      [OPENCODE_SESSION_HEADER]: deriveOpenCodeSessionId(lane, providerId),
+      [OPENCODE_GO_SESSION_HEADER]: deriveOpenCodeGoSessionId(sessionLane),
     },
   };
 }
-
-export const resolveOpenCodeGoTransport = resolveOpenCodeTransport;

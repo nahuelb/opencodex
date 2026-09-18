@@ -477,9 +477,8 @@ metadata. Astra preservation retains its separate effective effort and baseline 
 `recordAdapterReasoning` in `src/server/request-log.ts` copies the bounded, redacted fields
 to the active attempt and logical row before each send. Rebuilds replace those fields through
 the existing recorder; no prompt content is copied into this metadata.
-`tests/responses/responses-reasoning-log.test.ts` drives Zen Responses through fixture upstream responses and
+`tests/responses/responses-reasoning-log.test.ts` drives a generic routed Responses provider through fixture upstream responses and
 checks JSON/SSE persistence, mapping, omission, attempt fields, and prompt exclusion.
-Muse's accepted values follow the [catalog contract](../catalog.md#opencode-muse-effort-ladders).
 
 ### Declared-tool membership by inbound wire
 

@@ -194,7 +194,7 @@ falls back to the request-scoped lane it needs on every request.
 
 Cursor's Muse Spark 1.3 catalog, wire efforts, native image input, and price source follow the [Cursor catalog contract](../providers/cursor.md#muse-spark-catalog).
 
-Muse reasoning metadata follows the [exact catalog ladder](../catalog.md#opencode-muse-effort-ladders); its selected Responses adapter publishes [wire-effort metadata](../transports/responses.md#passthrough-effort-logging) before dispatch.
+Responses adapters publish [final wire-effort metadata](../transports/responses.md#passthrough-effort-logging) per attempt.
 
 A [manual compaction override](../transports/responses.md#manual-compaction-overrides) selects its target before adapter resolution and uses the existing registry factory.
 Shared response-log retention and native SSE inspection pacing follow the [bounded inspection contract](../transports/byte-accounting.md#response-log-inspection); other subsystem behavior remains unchanged.

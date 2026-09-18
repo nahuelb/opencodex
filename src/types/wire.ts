@@ -47,11 +47,6 @@ export const MODEL_ADAPTER_OVERRIDE_ALLOWED: ReadonlySet<string> = new Set([
  */
 const ANTHROPIC_WIRE_MODELS: Record<string, ReadonlySet<string>> = {
   "opencode-go": new Set(["minimax-m2.5", "minimax-m2.7", "minimax-m3"]),
-  // Union Alpha only speaks Anthropic Messages. Pin it on the existing Zen
-  // presets instead of a second provider; Muse Spark already stays on these
-  // rows via a Responses wire default.
-  "opencode-zen": new Set(["union-alpha"]),
-  "opencode-free": new Set(["union-alpha"]),
 };
 
 function anthropicWireModelsForProvider(providerName: string): ReadonlySet<string> | undefined {

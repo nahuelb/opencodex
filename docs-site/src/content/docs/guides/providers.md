@@ -513,42 +513,21 @@ headers. That is separate from the keyless desktop quota OpenCode advertises
 synthetic `Retry-After`; an upstream `Retry-After` still takes precedence. Same-key
 wait-and-retry remains opt-in via [`retryOn429`](/reference/configuration/).
 
-**Union Alpha on Zen uses the Anthropic Messages endpoint.** OpenCodex pins `union-alpha`
-on `opencode-zen` and `opencode-free` to `/zen/v1/messages`. Context is 262,144 tokens and
-max output is 131,072. Text and image input are supported. Zen advertises reasoning but no
-selectable effort levels. Session affinity uses the same conversation header as other Zen
-routes. These limits and the endpoint are published in
-[OpenCode's model metadata](https://github.com/anomalyco/models.dev/blob/dev/providers/opencode/models/union-alpha.toml).
+**The keyless `opencode-free` tier is currently closed to third-party clients.** Zen refuses
+any request that arrives without an `x-opencode-session` header, answering with error type
+`MissingSessionID` and the message "OpenCode's free tier can only be used in OpenCode". Presence
+of the header is the entire gate, so a proxy could pass it by inventing a value — opencodex does
+not. Minting a session identifier and a versioned `opencode/<version>` User-Agent is a claim to
+*be* the OpenCode client, and OpenCode publishes no third-party integration contract for this
+keyless tier; an HTTP 200 obtained that way is a bypassed admission check rather than
+permission. opencodex therefore reports the restriction instead of working around it: a request
+to `opencode-free` returns an error explaining the upstream gate and pointing here.
 
-**Muse Spark on Zen uses the Responses endpoint.** OpenCodex routes Muse Spark 1.3 and 1.2,
-including their `-contributor-free` variants, through `/zen/v1/responses`. Other models retain
-their existing routes. The `opencode-zen` and `opencode-free` presets send the User-Agent
-`opencodex opencode/<version>`, because since 2026-09-16 Zen admits free models only when the
-User-Agent carries an `opencode/<version>` token, and derive an opaque `x-opencode-session`
-header from the client's conversation ID in OpenCode's own `ses_` ID shape, which the same gate
-checks. The value stays stable across turns and differs between conversations and sibling
-subagents. An explicit provider session header takes precedence, and a provider User-Agent
-override replaces the registry value entirely.
-
-These Muse models offer exactly `minimal`, `low`, `medium`, `high`, and `xhigh` in the Codex
-picker on `opencode-zen` and `opencode-free`. Go's Muse 1.3/1.2 contributor models use the
-same ladder. OpenCodex sends each supported label unchanged as `reasoning.effort`; it does
-not add `max` or `ultra` picker options for these models. Older requests with those values
-map to `xhigh`. No default override is added; the picker still defaults to `medium`.
-
-Clients should send a stable session identity, such as `thread-id`, `session-id`, or
-`x-opencode-session`; Claude Code can supply it through `metadata.user_id`. Without one,
-OpenCodex allocates a session value for that request alone, so unrelated requests never share
-a conversation. Zen returns `MissingSessionID` or `FreeTierError` with "OpenCode's free tier
-can only be used from within OpenCode" when either the session header or the User-Agent token is
-missing, for example after a User-Agent override without the token. Adding an API key alone does
-not fix that error.
-
-A live check of `muse-spark-1.3-contributor-free` with a Zen key completed through Responses
-using this User-Agent and a conversation session header. This does not guarantee
-keyless access or availability for every account. Obtain a Zen key at
-[opencode.ai/auth](https://opencode.ai/auth); model access and quotas remain controlled by
-[OpenCode Zen](https://opencode.ai/docs/zen/).
+The supported route to the same models is the keyed **`opencode-zen`** provider with an OpenCode
+Zen API key from [opencode.ai/auth](https://opencode.ai/auth). If OpenCode later publishes a
+supported third-party path for the keyless tier, opencodex can follow it; until then the preset
+stays as documentation of the restriction. Upstream terms:
+[opencode.ai/docs/zen](https://opencode.ai/docs/zen/).
 
 Most use the `openai-chat` adapter with a bearer key; a few that expose only an Anthropic-compatible
 endpoint (e.g. **Xiaomi MiMo**) use the `anthropic` adapter (`x-api-key`).

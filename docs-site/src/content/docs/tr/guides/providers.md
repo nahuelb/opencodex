@@ -383,9 +383,22 @@ ekler; bir yukarı akış `Retry-After`'ı yine de önceliklidir. Aynı anahtarl
 bekle ve yeniden dene özelliği [`retryOn429`](/tr/reference/configuration/)
 aracılığıyla isteğe bağlı kalır.
 
-**Zen üzerindeki Muse Spark, `/zen/v1/responses` kullanır.** Bu, 1.3 ve 1.2 ile `-contributor-free` sürümlerini kapsar. `opencode-zen` ve `opencode-free`, Zen'in ücretsiz modeller için istediği `opencodex opencode/<version>` User-Agent değerini gönderir ve konuşma kimliğinden opak bir `x-opencode-session` başlığı türetir. Değer aynı konuşmada sabit kalır ve farklı konuşmaları ayırır. Açıkça ayarlanmış sağlayıcı başlığı önceliklidir.
+**Anahtarsız `opencode-free` katmanı şu anda üçüncü taraf istemcilere kapalıdır.** Zen,
+`x-opencode-session` başlığı olmadan gelen her isteği reddeder ve `MissingSessionID` hata
+tipiyle "OpenCode's free tier can only be used in OpenCode" mesajını döndürür. Kapıda
+yalnızca başlığın varlığı denetlenir; yani bir proxy uydurma bir değerle geçebilirdi,
+opencodex bunu yapmaz. Bir oturum kimliği ile sürüm taşıyan `opencode/<version>`
+User-Agent üretmek, kendini OpenCode istemcisi ilan etmek demektir ve OpenCode bu
+anahtarsız katman için üçüncü taraf entegrasyon sözleşmesi yayımlamamıştır; böyle elde
+edilen bir HTTP 200, izin değil atlatılmış bir kabul denetimidir. Bu yüzden opencodex
+kısıtlamayı aşmak yerine bildirir: `opencode-free` sağlayıcısına giden bir istek, yukarı
+akıştaki kapıyı açıklayan bir hata döndürür.
 
-İstemci `thread-id`, `session-id`, `x-opencode-session` veya Claude Code için `metadata.user_id` göndermelidir. Oturum kimliği yoksa OpenCodex yalnızca o istek için bir oturum değeri atar. Oturum veya User-Agent belirteci eksikse Zen, `MissingSessionID` veya `FreeTierError` döndürür. Yalnızca API anahtarı eklemek bu hatayı çözmez. Zen anahtarıyla ücretsiz Muse Spark 1.3 yanıtı doğrulandı; anahtarsız erişimi ve model kullanılabilirliğini [OpenCode Zen](https://opencode.ai/docs/zen/) belirler.
+Aynı modellere giden desteklenen yol, [opencode.ai/auth](https://opencode.ai/auth)
+üzerinden alınan bir OpenCode Zen API anahtarıyla kullanılan anahtarlı
+**`opencode-zen`** sağlayıcısıdır. OpenCode ileride anahtarsız katman için desteklenen
+bir üçüncü taraf yolu yayımlarsa opencodex bunu izleyebilir; o zamana kadar önayar
+kısıtlamayı belgeler. Yukarı akış koşulları: [opencode.ai/docs/zen](https://opencode.ai/docs/zen/).
 
 Çoğu bir taşıyıcı anahtarla `openai-chat` adaptörünü kullanır; yalnızca
 Anthropic uyumlu bir uç nokta sunan birkaç tanesi (örneğin **Xiaomi MiMo**)

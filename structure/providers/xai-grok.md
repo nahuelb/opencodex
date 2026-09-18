@@ -144,10 +144,6 @@ Live sideband admission and its bounded upstream handshake follow the [runtime c
 
 Translated audio/file admission follows the [final-adapter input contract](../adapters/registry.md#untranslated-input-media); native raw passthrough remains separate.
 
-Registry consumers preserve the [OpenCode Muse ladder](../catalog.md#opencode-muse-effort-ladders); xAI reasoning declarations and routing remain independent.
-
-OpenCode Zen Anthropic destinations use the [shared conversation-affinity contract](../transports/inventory.md#opencode-zen-anthropic-affinity).
-
 Routed Grok compaction uses the existing adapter and summary contract after a same-provider
 [manual compaction model override](../transports/responses.md#manual-compaction-overrides); a
 cross-provider override runs the portable summarizer on the selected provider instead.

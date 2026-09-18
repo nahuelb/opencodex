@@ -364,7 +364,7 @@ Canonical Responses identity sanitation and narrowly scoped pre-output combo rec
 
 Cursor's Muse Spark 1.3 catalog, wire efforts, native image input, and price source follow the [Cursor catalog contract](../providers/cursor.md#muse-spark-catalog).
 
-Zen Muse Responses uses the [exact Muse ladder](../catalog.md#opencode-muse-effort-ladders) and [passthrough effort metadata](../transports/responses.md#passthrough-effort-logging), separate from Chat wire fields.
+Responses adapters publish [final wire-effort metadata](../transports/responses.md#passthrough-effort-logging) per attempt.
 
 Upstream API-key usage follows the [physical-attempt account attribution contract](../gui-and-management-api.md#upstream-key-account-attribution), independently of subscription quota observations.
 

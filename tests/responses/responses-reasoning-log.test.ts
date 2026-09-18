@@ -8,27 +8,28 @@ import { addFinalRequestLog, clearRequestLogsForTests, httpStatusForRequestLogTe
 import { readUsageEntries, resetUsageReadCacheForTests } from "../../src/usage/log";
 import type { OcxConfig } from "../../src/types";
 import { removeTreeWithRetry } from "../helpers/remove-tree";
-import { providerConfigSeed } from "../../src/providers/derive";
-import { getProviderRegistryEntry } from "../../src/providers/registry";
 
 for (const { effort, stream, stripped } of [
   { effort: "xhigh" }, { effort: "minimal" }, { effort: "ultra" }, {},
   { effort: "xhigh", stream: true }, { effort: "xhigh", stripped: true },
 ] as Array<{ effort?: string; stream?: boolean; stripped?: boolean }>) {
-  test(`Zen Responses persists its actual wire effort (${effort ?? "absent"}, stream=${!!stream}, stripped=${!!stripped})`, async () => {
+  test(`Routed Responses persists its actual wire effort (${effort ?? "absent"}, stream=${!!stream}, stripped=${!!stripped})`, async () => {
     const previousHome = process.env.OPENCODEX_HOME;
-    const home = mkdtempSync(join(tmpdir(), "ocx-zen-effort-"));
+    const home = mkdtempSync(join(tmpdir(), "ocx-routed-effort-"));
     process.env.OPENCODEX_HOME = home;
-    const model = "muse-spark-1.3-contributor-free";
-    const provider = providerConfigSeed(getProviderRegistryEntry("opencode-zen")!);
+    const model = "reasoning-model";
+    const provider: OcxConfig["providers"][string] = {
+      adapter: "openai-responses", baseUrl: "https://example.test/v1",
+      modelReasoningEfforts: { [model]: ["minimal", "low", "medium", "high", "xhigh"] },
+    };
     if (stripped) provider.modelReasoningEfforts = { [model]: [] };
-    const config = { providers: { "opencode-zen": { ...provider, apiKey: "test-key" } } } as OcxConfig;
+    const config = { providers: { "test-provider": { ...provider, apiKey: "test-key" } } } as OcxConfig;
     const captured: Array<{ reasoning?: { effort?: string } }> = [];
     const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
-      expect(String(url)).toBe("https://opencode.ai/zen/v1/responses");
+      expect(String(url)).toBe("https://example.test/v1/responses");
       captured.push(JSON.parse(String(init?.body)));
       const response = {
-        id: "resp_zen_effort", object: "response", status: "completed", model,
+        id: "resp_routed_effort", object: "response", status: "completed", model,
         output: [{ type: "message", role: "assistant", content: [{ type: "output_text", text: "ok" }] }],
         usage: { input_tokens: 5, output_tokens: 1, total_tokens: 6 },
       };
@@ -40,13 +41,13 @@ for (const { effort, stream, stripped } of [
     });
     try {
       const logCtx: RequestLogContext = { model: "", provider: "" };
-      const requestId = `zen-${effort ?? "absent"}`;
+      const requestId = `routed-${effort ?? "absent"}`;
       const start = Date.now();
       const terminalLogged = Promise.withResolvers<void>();
       const response = await handleResponses(new Request("http://localhost/v1/responses", {
-        method: "POST", headers: { "content-type": "application/json", "thread-id": "zen-effort-fixture" },
+        method: "POST", headers: { "content-type": "application/json", "thread-id": "routed-effort-fixture" },
         body: JSON.stringify({
-          model: `opencode-zen/${model}`, input: "private-prompt-marker", stream: !!stream,
+          model: `test-provider/${model}`, input: "private-prompt-marker", stream: !!stream,
           ...(effort ? { reasoning: { effort } } : {}),
         }),
       }), config, logCtx, stream ? {
@@ -62,7 +63,7 @@ for (const { effort, stream, stripped } of [
       await loggedResponse.text();
       if (stream) await terminalLogged.promise;
       expect(captured).toHaveLength(1);
-      const wireEffort = stripped ? undefined : effort === "ultra" ? "xhigh" : effort;
+      const wireEffort = stripped ? undefined : effort === "ultra" ? "xhigh" : effort === "minimal" ? "low" : effort;
       expect(captured[0]?.reasoning?.effort).toBe(wireEffort);
       const rows = readUsageEntries();
       expect(rows).toHaveLength(1);

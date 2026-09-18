@@ -1,6 +1,5 @@
 import type { OcxConfig } from "../../types";
 import { effectiveProviderAlias } from "../../providers/default-aliases";
-import { OPENCODE_ZEN_MUSE_MODELS } from "../../providers/registry/model-seeds";
 import { identifyRoutedModel } from "../../adapters/identity";
 import { COMBO_NAMESPACE } from "../../combos";
 import {
@@ -94,11 +93,6 @@ function preservePinnedNativeCustomReasoning(model?: CatalogModel): boolean {
     && Array.isArray(model.reasoningEfforts);
 }
 
-export function preservesOpenCodeReasoningEfforts(provider: string, modelId: string): boolean {
-  return provider === "opencode-go"
-    || ((provider === "opencode-zen" || provider === "opencode-free") && OPENCODE_ZEN_MUSE_MODELS.includes(modelId));
-}
-
 /**
  * Cria uma entrada nativa ou roteada a partir do snapshot upstream, de um clone
  * do template ou de campos mínimos. Aplica os metadados e limites pertinentes
@@ -114,7 +108,8 @@ export function deriveEntry(
   contextCap?: NativeContextLimitsInput,
 ): RawEntry {
   const preserveExact = isExactComboCatalogModel(model, exactComboSlugs);
-  const preserveExactReasoning = preserveExact || (model !== undefined && preservesOpenCodeReasoningEfforts(model.provider, model.id));
+  // Go exposes model-specific upstream enums; synthetic tiers mislead subagent overrides.
+  const preserveExactReasoning = preserveExact || model?.provider === "opencode-go";
   const codexForwardNativeCapabilityAlias = model?.codexForwardNativeCapabilityAlias === true
     ? upstreamNativeEntry(model.id)
     : null;

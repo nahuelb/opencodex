@@ -1,10 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { PROVIDER_REGISTRY, mergeRegistryStaticHeaders } from "../../src/providers/registry";
+import { PROVIDER_REGISTRY } from "../../src/providers/registry";
 import { providerConfigSeed, deriveKeyLoginMap, deriveFeaturedProviderIds } from "../../src/providers/derive";
 import { createOpenAIChatAdapter } from "../../src/adapters/openai-chat";
 import { routedProviderConfig } from "../../src/router";
 import { buildModelsRequest } from "../../src/oauth";
-import { OPENCODE_CLIENT_USER_AGENT_TOKEN, OPENCODE_ZEN_USER_AGENT } from "../../src/providers/registry/opencode-headers";
 import type { OcxParsedRequest, OcxProviderConfig } from "../../src/types";
 
 function minimalRequest(model = "kimi-k2.7-code"): OcxParsedRequest {
@@ -30,20 +29,17 @@ describe("opencode-free provider", () => {
     expect(entry?.models).toBeUndefined();
   });
 
-  test("static headers name OpenCodex and carry the opencode/<version> token Zen's free tier requires", () => {
+  test("static headers include only the public client markers", () => {
     expect(entry?.staticHeaders?.["Authorization"]).toBeUndefined();
-    expect(entry?.staticHeaders?.["User-Agent"]).toBe(OPENCODE_ZEN_USER_AGENT);
-    expect(OPENCODE_ZEN_USER_AGENT).toStartWith("opencodex ");
-    expect(OPENCODE_CLIENT_USER_AGENT_TOKEN).toMatch(/^opencode\/\d+\.\d+\.\d+$/);
-    expect(OPENCODE_ZEN_USER_AGENT).toContain(OPENCODE_CLIENT_USER_AGENT_TOKEN);
-    expect(entry?.staticHeaders?.["x-opencode-client"]).toBeUndefined();
+    expect(entry?.staticHeaders?.["User-Agent"]).toBe("opencode");
+    expect(entry?.staticHeaders?.["x-opencode-client"]).toBe("desktop");
   });
 
   test("providerConfigSeed propagates static headers", () => {
     const seed = providerConfigSeed(entry!);
     expect(seed.headers?.["Authorization"]).toBeUndefined();
-    expect(seed.headers?.["User-Agent"]).toBe(OPENCODE_ZEN_USER_AGENT);
-    expect(seed.headers?.["x-opencode-client"]).toBeUndefined();
+    expect(seed.headers?.["User-Agent"]).toBe("opencode");
+    expect(seed.headers?.["x-opencode-client"]).toBe("desktop");
     expect(seed.keyOptional).toBe(true);
     expect(seed.liveModels).toBe(true);
   });
@@ -63,8 +59,8 @@ describe("opencode-free provider", () => {
     const req = adapter.buildRequest(minimalRequest());
     const headers = req.headers as Record<string, string>;
     expect(headers["Authorization"]).toBeUndefined();
-    expect(headers["User-Agent"]).toBe(OPENCODE_ZEN_USER_AGENT);
-    expect(headers["x-opencode-client"]).toBeUndefined();
+    expect(headers["User-Agent"]).toBe("opencode");
+    expect(headers["x-opencode-client"]).toBe("desktop");
     expect(req.url).toBe("https://opencode.ai/zen/v1/chat/completions");
   });
 
@@ -77,7 +73,7 @@ describe("opencode-free provider", () => {
     const req = adapter.buildRequest(minimalRequest());
     const headers = req.headers as Record<string, string>;
     expect(headers["Authorization"]).toBe("Bearer user-secret-key");
-    expect(headers["x-opencode-client"]).toBeUndefined();
+    expect(headers["x-opencode-client"]).toBe("desktop");
   });
 
   test("the provider client marker still applies when a user apiKey is present", () => {
@@ -89,7 +85,7 @@ describe("opencode-free provider", () => {
     const req = adapter.buildRequest(minimalRequest());
     const headers = req.headers as Record<string, string>;
     expect(headers["Authorization"]).toBe("Bearer user-secret-key");
-    expect(headers["x-opencode-client"]).toBeUndefined();
+    expect(headers["x-opencode-client"]).toBe("desktop");
     expect(Object.keys(headers)).toContain("Authorization");
   });
 
@@ -108,34 +104,20 @@ describe("opencode-free provider", () => {
 
     test("a config saved with no header block gains the full registry set", () => {
       const routed = routedProviderConfig("opencode-free", persisted());
-      expect(routed.headers?.["User-Agent"]).toBe(OPENCODE_ZEN_USER_AGENT);
-      expect(routed.headers?.["x-opencode-client"]).toBeUndefined();
+      expect(routed.headers?.["User-Agent"]).toBe("opencode");
+      expect(routed.headers?.["x-opencode-client"]).toBe("desktop");
     });
 
     test("a config saved with only the older marker gains the new one", () => {
       const routed = routedProviderConfig("opencode-free", persisted({ "x-opencode-client": "desktop" }));
-      expect(routed.headers?.["User-Agent"]).toBe(OPENCODE_ZEN_USER_AGENT);
+      expect(routed.headers?.["User-Agent"]).toBe("opencode");
       expect(routed.headers?.["x-opencode-client"]).toBe("desktop");
-    });
-
-    test("a persisted copy of the previous registry User-Agent is replaced, not kept as an override", () => {
-      // Configs saved while the registry wrote `opencodex` carry that value verbatim; treating it as
-      // a user override would pin every such install to the fingerprint Zen now rejects.
-      for (const name of ["User-Agent", "user-agent"]) {
-        const routed = routedProviderConfig("opencode-free", persisted({ [name]: "opencodex" }));
-        const uaKeys = Object.keys(routed.headers ?? {}).filter(k => k.toLowerCase() === "user-agent");
-        expect(uaKeys).toEqual(["User-Agent"]);
-        expect(routed.headers?.["User-Agent"]).toBe(OPENCODE_ZEN_USER_AGENT);
-      }
-      // A row that defines no User-Agent of its own keeps the user's value verbatim.
-      const kept = mergeRegistryStaticHeaders({ "x-api-version": "1.0.0" }, { "User-Agent": "opencodex" });
-      expect(kept).toEqual({ "User-Agent": "opencodex", "x-api-version": "1.0.0" });
     });
 
     test("the merged headers reach the wire, not just the resolved config", () => {
       const routed = routedProviderConfig("opencode-free", persisted({ "x-opencode-client": "desktop" }));
       const req = createOpenAIChatAdapter(routed).buildRequest(minimalRequest());
-      expect((req.headers as Record<string, string>)["User-Agent"]).toBe(OPENCODE_ZEN_USER_AGENT);
+      expect((req.headers as Record<string, string>)["User-Agent"]).toBe("opencode");
     });
 
     test("a user override wins and does not become a second comma-joined value", () => {
@@ -148,14 +130,14 @@ describe("opencode-free provider", () => {
       expect(routed.headers?.["user-agent"]).toBe("custom-agent");
       expect(new Headers(routed.headers as Record<string, string>).get("user-agent")).toBe("custom-agent");
       // Names the user did not claim are still filled.
-      expect(routed.headers?.["x-opencode-client"]).toBeUndefined();
+      expect(routed.headers?.["x-opencode-client"]).toBe("desktop");
     });
 
     test("model discovery carries the same fingerprint as inference", () => {
-      // A provider identified as `opencodex` when it completes but anonymous when it lists its
+      // A provider identified as `opencode` when it completes but anonymous when it lists its
       // own models reads as two different clients to an upstream rate limiter.
       const req = buildModelsRequest(persisted({ "x-opencode-client": "desktop" }), undefined, "opencode-free");
-      expect(req.headers["User-Agent"]).toBe(OPENCODE_ZEN_USER_AGENT);
+      expect(req.headers["User-Agent"]).toBe("opencode");
       expect(req.headers["x-opencode-client"]).toBe("desktop");
     });
 
@@ -167,10 +149,10 @@ describe("opencode-free provider", () => {
     });
   });
 
-  test("provider note describes optional keys and upstream availability", () => {
-    expect(entry?.note?.toLowerCase()).toContain("key-optional");
+  test("provider note mentions no key needed", () => {
+    expect(entry?.note?.toLowerCase()).toContain("no key needed");
     expect(entry?.note?.toLowerCase()).toContain("200");
-    expect(entry?.note?.toLowerCase()).toContain("upstream availability");
+    expect(entry?.note?.toLowerCase()).toContain("discovered live from zen");
   });
 
   test("DeepSeek Free preserves reasoning content for tool-call history", () => {

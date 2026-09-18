@@ -388,7 +388,6 @@ current physical response contribution, preserving prior sends on the same key w
 repeated inspections twice. Consumers sum the flat attempts once and keep subscription quota
 observations separate from token or API-equivalent cost totals.
 
-
 `src/server/hub-usage.ts` serves `GET /v1/usage` on hubs for an explicit configured data key. The authenticated key selects the aggregate; query parameters cannot select an API-key identity. Unscoped environment/admin credentials and loopback bypass are not admitted. The response projects only this client's numeric totals, provider/model/day rows and incomplete-history metadata through `src/remote/hub-usage.ts`; accounts, raw records and key IDs are omitted. Unknown fields are stripped at every object boundary and the serialized body is capped at 1 MiB.
 
 Custom usage windows are immutable bounds on the streaming accumulator, applied to each

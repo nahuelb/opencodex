@@ -142,18 +142,21 @@ describe("opencode-zen rate-limit guidance (#1145)", () => {
   });
 });
 
+/**
+ * Zen closed the keyless tier to non-OpenCode clients. The gate is the mere presence of
+ * `x-opencode-session`, so opencodex could pass it by inventing a value; it does not, and the
+ * user-facing failure has to say that rather than leaking `MissingSessionID` through.
+ */
 describe("opencode-free keyless tier lock-in (#4121)", () => {
   /** Verbatim upstream body from the issue, as the Responses wire forwards it. */
   const RAW_UPSTREAM = String.raw`{"type":"error","error":{"type":"MissingSessionID","message":"Error from provider (Console): OpenCode's free tier can only be used in OpenCode"}}`;
-  /** Body Zen returns since 2026-09-16 when the User-Agent lacks the opencode/<version> token. */
-  const RAW_FREE_TIER_UPSTREAM = String.raw`{"type":"error","error":{"type":"FreeTierError","message":"Error from provider (Console): OpenCode's free tier can only be used from within OpenCode"}}`;
   const FREE_TIER_ROUTE = {
     providerName: "opencode-free",
     baseUrl: "https://opencode.ai/zen/v1",
     adapter: "openai-chat",
   };
 
-  test("registry note explains session identity and upstream availability", () => {
+  test("registry note states the gate, the refusal to impersonate, and the keyed alternative", () => {
     const note = PROVIDER_REGISTRY.find(e => e.id === "opencode-free")?.note?.toLowerCase();
     expect(note).toBeDefined();
     expect(note).toContain("x-opencode-session");
@@ -174,16 +177,11 @@ describe("opencode-free keyless tier lock-in (#4121)", () => {
     expect(isOpenCodeZenFreeTierLockIn(
       "Provider error 400: OpenCode's free tier can only be used in OpenCode",
     )).toBe(true);
-    expect(isOpenCodeZenFreeTierLockIn(RAW_FREE_TIER_UPSTREAM)).toBe(true);
-    expect(isOpenCodeZenFreeTierLockIn(
-      "Provider error 403: Error from provider (Console)",
-      "FreeTierError",
-    )).toBe(true);
     expect(isOpenCodeZenFreeTierLockIn("Provider error 500: boom")).toBe(false);
     expect(isOpenCodeZenFreeTierLockIn("Provider error 500: boom", "server_error")).toBe(false);
   });
 
-  test("the client error explains missing session identity", () => {
+  test("the client error explains the gate and names the supported keyed route", () => {
     const enriched = enrichOpenCodeZenFreeTierMessage(
       `Provider error 400: ${RAW_UPSTREAM}`,
       FREE_TIER_ROUTE,
@@ -192,11 +190,8 @@ describe("opencode-free keyless tier lock-in (#4121)", () => {
     expect(enriched).toContain("opencode-zen");
     expect(enriched).toContain("https://opencode.ai/auth");
     expect(enriched).toContain("https://opencode.ai/docs/zen/");
-    expect(enriched).toContain("requires a stable conversation session");
-    expect(enriched).toContain("alone does not fix missing session identity");
-    expect(enriched).toContain("opencode/<version> User-Agent");
-    const freeTier = enrichOpenCodeZenFreeTierMessage(`Provider error 403: ${RAW_FREE_TIER_UPSTREAM}`, FREE_TIER_ROUTE);
-    expect(freeTier).toContain("requires a stable conversation session");
+    // The user is told opencodex declines to impersonate, not that the request merely failed.
+    expect(enriched).toContain("does not send a fabricated OpenCode session header");
   });
 
   test("enrichment is scoped to Zen destinations and to this error", () => {

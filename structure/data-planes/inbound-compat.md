@@ -320,7 +320,6 @@ onto it. Dropping it let a provider default re-enable reasoning the caller had
 explicitly turned off, which is not neutral for the Anthropic families that think by
 default and require an explicit `thinking:{type:"disabled"}` to stop.
 
-
 ## Media at the Chat translation boundary
 
 The native Chat path retains provider-native file/audio blocks. When a request instead needs

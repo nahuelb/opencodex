@@ -9,7 +9,6 @@ import {
   MOONSHOT_INTL_BASE_URL,
 } from "../base-url-choices";
 import { COMMAND_CODE_MODEL_REASONING_EFFORTS } from "../command-code-efforts";
-import { OPENCODE_ZEN_USER_AGENT } from "./opencode-headers";
 import {
   CODEBUDDY_CN_MODELS,
   CODEBUDDY_CN_MODEL_CONTEXT_WINDOWS,
@@ -52,13 +51,6 @@ import {
   OPENCODE_FREE_DEEPSEEK_MODELS,
   OPENCODE_ZEN_TEXT_ONLY_MODELS,
   OPENCODE_ZEN_IMAGE_MODELS,
-  OPENCODE_ZEN_MUSE_MODELS,
-  OPENCODE_ZEN_UNION_ALPHA_MODEL,
-  OPENCODE_ZEN_UNION_ALPHA_CONTEXT_WINDOW,
-  OPENCODE_ZEN_UNION_ALPHA_MAX_OUTPUT_TOKENS,
-  META_MUSE_CONTEXT_WINDOW,
-  META_MUSE_REASONING_EFFORTS,
-  META_MUSE_REASONING_EFFORT_MAP,
   deepseekThinkingEffortsFor,
   deepseekReasoningMapFor,
   ALIBABA_TOKEN_PLAN_MODELS,
@@ -915,45 +907,32 @@ export const PROVIDER_REGISTRY_EXTENDED: readonly ProviderRegistryEntry[] = [
   },
   {
     id: "opencode-zen", label: "opencode zen", baseUrl: "https://opencode.ai/zen/v1", adapter: "openai-chat", authKind: "key", dashboardUrl: "https://opencode.ai/auth",
-    destinationAliases: [{ baseUrl: "https://opencode.ai/zen/v1", adapter: "anthropic" }],
     // Same opencode.ai/zen/v1 gateway as `opencode-free` (keyed tier): DeepSeek thinking mode
     // requires the assistant's original reasoning_content to be replayed on tool-call
     // continuations, or the gateway answers HTTP 400 (issues #950/#994). Mirror the DeepSeek
     // reasoning + thinking metadata so `opencode-zen/deepseek-v4-flash-free` — and the other
     // Zen DeepSeek thinking models — never serialize a bare tool-call turn.
     note: "Keyed OpenCode Zen gateway. Free models on this tier are often short-window rate-limited at roughly 15-20 requests/minute (community-measured; OpenCode does not publish RPM). Zen may return generic 429s without Retry-After / X-RateLimit headers; when Retry-After is omitted, opencodex adds a synthetic backoff hint (upstream Retry-After still wins). Distinct from the keyless opencode-free desktop quota (~200 Big Pickle/free-model requests per 5 hours). Docs: https://opencode.ai/docs/zen/. Free-model prompts may be retained for training — do not send confidential material.",
-    modelReasoningEfforts: {
-      ...Object.fromEntries([...DEEPSEEK_GATEWAY_THINKING_MODELS, ...OPENCODE_FREE_DEEPSEEK_MODELS].map(id => [id, deepseekThinkingEffortsFor(id)])),
-      ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, META_MUSE_REASONING_EFFORTS])),
-      [OPENCODE_ZEN_UNION_ALPHA_MODEL]: [],
-    },
-    modelReasoningEffortMap: {
-      ...Object.fromEntries([...DEEPSEEK_GATEWAY_THINKING_MODELS, ...OPENCODE_FREE_DEEPSEEK_MODELS].map(id => [id, deepseekReasoningMapFor(id)])),
-      ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, META_MUSE_REASONING_EFFORT_MAP])),
-    },
+    modelReasoningEfforts: Object.fromEntries(
+      [...DEEPSEEK_GATEWAY_THINKING_MODELS, ...OPENCODE_FREE_DEEPSEEK_MODELS].map(id => [id, deepseekThinkingEffortsFor(id)]),
+    ),
+    modelReasoningEffortMap: Object.fromEntries(
+      [...DEEPSEEK_GATEWAY_THINKING_MODELS, ...OPENCODE_FREE_DEEPSEEK_MODELS].map(id => [id, deepseekReasoningMapFor(id)]),
+    ),
     preserveReasoningContentModels: [...DEEPSEEK_GATEWAY_THINKING_MODELS, ...OPENCODE_FREE_DEEPSEEK_MODELS],
     // Same Zen gateway as opencode-free: the DeepSeek vision preview id
     // (merges into deepseek-v4-flash later).
     modelContextWindows: {
-      ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, META_MUSE_CONTEXT_WINDOW])),
       [DEEPSEEK_VISION_PREVIEW_MODEL]: 1_048_576,
-      [OPENCODE_ZEN_UNION_ALPHA_MODEL]: OPENCODE_ZEN_UNION_ALPHA_CONTEXT_WINDOW,
     },
     modelInputModalities: {
-      ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, ["text", "image"] as string[]])),
       [DEEPSEEK_VISION_PREVIEW_MODEL]: ["text", "image"],
       ...Object.fromEntries(OPENCODE_ZEN_IMAGE_MODELS.map(id => [id, ["text", "image"] as string[]])),
-      [OPENCODE_ZEN_UNION_ALPHA_MODEL]: ["text", "image"],
     },
     noVisionModels: [...OPENCODE_ZEN_TEXT_ONLY_MODELS, ...DEEPSEEK_GATEWAY_THINKING_MODELS],
     // Same DeepSeek routes as the Go preset above, behind the same vendor, so they carry
     // the same json_schema rejection (#1338 / #1415).
     noJsonSchemaModels: [...DEEPSEEK_GATEWAY_THINKING_MODELS, ...OPENCODE_FREE_DEEPSEEK_MODELS],
-    modelMaxOutputTokens: { [OPENCODE_ZEN_UNION_ALPHA_MODEL]: OPENCODE_ZEN_UNION_ALPHA_MAX_OUTPUT_TOKENS },
-    modelDisplayNames: { [OPENCODE_ZEN_UNION_ALPHA_MODEL]: "Union Alpha Free (Zen)" },
-    modelWireDefaults: Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, "openai-responses" as const])),
-    staticHeaders: { "User-Agent": OPENCODE_ZEN_USER_AGENT },
-    preserveCustomDestination: true,
   },
   { id: "vercel-ai-gateway", label: "Vercel AI Gateway", baseUrl: "https://ai-gateway.vercel.sh/v1", adapter: "openai-chat", authKind: "key", dashboardUrl: "https://vercel.com/dashboard" },
   {
@@ -965,31 +944,32 @@ export const PROVIDER_REGISTRY_EXTENDED: readonly ProviderRegistryEntry[] = [
     keyOptional: true,
     featured: true,
     liveModels: true,
-    note: "Key-optional OpenCode Zen free models. OpenCodex sends the opencode/<version> User-Agent token Zen requires for free models and derives x-opencode-session from a stable conversation ID, or from a per-request lane when the client sends none. A request Zen still refuses returns MissingSessionID or FreeTierError; adding a key alone does not fix it. Upstream availability and account restrictions still apply. OpenCode advertises about 200 Big Pickle/free-model requests per 5 hours; short-window limits can be roughly 15-20 requests/minute. When Retry-After is absent, OpenCodex adds a backoff hint. Use opencode-zen for a Zen API key. Free-model prompts may be retained for training. Docs: https://opencode.ai/docs/zen/.",
+    note: "No key needed, but OpenCode now gates this tier to its own client: Zen refuses any request that arrives without an x-opencode-session header (error type MissingSessionID, \"OpenCode's free tier can only be used in OpenCode\"). opencodex does not mint that header or claim an OpenCode client identity, because no upstream contract authorizes a third-party agent to present itself as OpenCode. Until OpenCode publishes a third-party integration path for the keyless tier, use the keyed opencode-zen provider instead (https://opencode.ai/auth). Quota figures for when the tier admitted a request: OpenCode advertises about 200 Big Pickle/free-model requests per 5 hours, and the same Zen gateway can short-window rate-limit free models at roughly 15-20 requests/minute, and may return generic 429s without Retry-After (opencodex synthesizes backoff only when that header is omitted). Free models are discovered live from Zen. Data use: per OpenCode's Zen docs (https://opencode.ai/docs/zen/), prompts sent to free models may be retained and used for training/improvement — do not send confidential material through this provider.",
     dashboardUrl: "https://opencode.ai",
-    staticHeaders: { "User-Agent": OPENCODE_ZEN_USER_AGENT },
-    modelReasoningEfforts: {
-      ...Object.fromEntries(OPENCODE_FREE_DEEPSEEK_MODELS.map(id => [id, deepseekThinkingEffortsFor(id)])),
-      ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, META_MUSE_REASONING_EFFORTS])),
-      [OPENCODE_ZEN_UNION_ALPHA_MODEL]: [],
+    staticHeaders: {
+      // Zen answers a bare runtime User-Agent (Bun/x.y.z) more aggressively than a client
+      // that identifies itself, which is what the 429 in #2067 traced to. The value is
+      // deliberately unversioned: a pinned "opencode-cli/<version>" is a claim about an
+      // install we do not have and goes stale on the vendor's schedule, not ours.
+      // Corroboration, not authority: OmniRoute — an independent open-source broker against
+      // the same Zen upstream — defaults to exactly this pair (userAgent "opencode", client
+      // "desktop") in open-sse/executors/opencode.ts, and got there by RETREATING from its
+      // own earlier "opencode-cli/1.0.0" pin. An operator can still override either value
+      // through the provider headers API; user headers win case-insensitively at route time.
+      "User-Agent": "opencode",
+      "x-opencode-client": "desktop",
     },
-    modelReasoningEffortMap: {
-      ...Object.fromEntries(OPENCODE_FREE_DEEPSEEK_MODELS.map(id => [id, deepseekReasoningMapFor(id)])),
-      ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, META_MUSE_REASONING_EFFORT_MAP])),
-    },
+    modelReasoningEfforts: Object.fromEntries(OPENCODE_FREE_DEEPSEEK_MODELS.map(id => [id, deepseekThinkingEffortsFor(id)])),
+    modelReasoningEffortMap: Object.fromEntries(OPENCODE_FREE_DEEPSEEK_MODELS.map(id => [id, deepseekReasoningMapFor(id)])),
     preserveReasoningContentModels: OPENCODE_FREE_DEEPSEEK_MODELS,
     // The DeepSeek vision preview id is preemptive metadata for when Zen starts
     // serving it (merges into v4-flash later).
     modelContextWindows: {
-      ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, META_MUSE_CONTEXT_WINDOW])),
       [DEEPSEEK_VISION_PREVIEW_MODEL]: 1_048_576,
-      [OPENCODE_ZEN_UNION_ALPHA_MODEL]: OPENCODE_ZEN_UNION_ALPHA_CONTEXT_WINDOW,
     },
     modelInputModalities: {
-      ...Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, ["text", "image"] as string[]])),
       [DEEPSEEK_VISION_PREVIEW_MODEL]: ["text", "image"],
       ...Object.fromEntries(OPENCODE_ZEN_IMAGE_MODELS.map(id => [id, ["text", "image"] as string[]])),
-      [OPENCODE_ZEN_UNION_ALPHA_MODEL]: ["text", "image"],
     },
     // Same Zen roster behind the same base URL, so it carries the same measured
     // text-only list rather than only its DeepSeek member (#1043).
@@ -998,10 +978,6 @@ export const PROVIDER_REGISTRY_EXTENDED: readonly ProviderRegistryEntry[] = [
     // the keyed tier's json_schema treatment and its reasoning contract rather than a
     // narrower table that silently falls behind whenever the keyed one is updated.
     noJsonSchemaModels: [...DEEPSEEK_GATEWAY_THINKING_MODELS, ...OPENCODE_FREE_DEEPSEEK_MODELS],
-    modelMaxOutputTokens: { [OPENCODE_ZEN_UNION_ALPHA_MODEL]: OPENCODE_ZEN_UNION_ALPHA_MAX_OUTPUT_TOKENS },
-    modelDisplayNames: { [OPENCODE_ZEN_UNION_ALPHA_MODEL]: "Union Alpha Free (Zen)" },
-    modelWireDefaults: Object.fromEntries(OPENCODE_ZEN_MUSE_MODELS.map(id => [id, "openai-responses" as const])),
-    preserveCustomDestination: true,
   },
   { id: "xiaomi", label: "Xiaomi MiMo", baseUrl: "https://api.xiaomimimo.com/anthropic", adapter: "anthropic", authKind: "key", dashboardUrl: "https://xiaomimimo.com", defaultModel: "mimo-v2.5-pro" },
   // Xiaomi's public OpenAI-compatible endpoint is a distinct transport from both the Anthropic

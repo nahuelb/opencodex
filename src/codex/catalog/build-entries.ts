@@ -44,7 +44,7 @@ import {
 import { accountBoundNativeDisplayName, CODEX_ACCOUNT_BOUND_CATALOG_KIND, trustedAccountBoundNativeCatalogSlug } from "./account-models";
 import { NATIVE_RESERVE_MODEL } from "./native-models";
 import { isReserveCatalogProjection, type ReserveCatalogProjection } from "./reserve";
-import { deriveEntry, finishUpstreamNativeEntry, isExactComboCatalogEntry, preservesOpenCodeReasoningEfforts } from "./derive-entry";
+import { deriveEntry, finishUpstreamNativeEntry, isExactComboCatalogEntry } from "./derive-entry";
 import { PICKER_ORDER_PRIORITY_BASE, SPAWN_PRIORITY_FIELD } from "./subagent-roster";
 
 export interface ObservedCatalogEntryBuildInput {
@@ -861,13 +861,7 @@ export function mergeCatalogEntriesFromObservedState({
     // Mock-max universality (260709): preserved routed entries from disk may predate
     // the max rung — ensure it here so subagent max spawns validate on every
     // reasoning-capable entry. max only: 5.6 exact ladders (luna: no ultra) stay intact.
-    const slug = String(e.slug ?? "");
-    const provenance = e.opencodex_capability_provenance as { provider?: unknown; model_id?: unknown } | undefined;
-    const exactOpenCode = preservesOpenCodeReasoningEfforts(
-      typeof provenance?.provider === "string" ? provenance.provider : slug.slice(0, slug.indexOf("/")),
-      typeof provenance?.model_id === "string" ? provenance.model_id : slug.slice(slug.indexOf("/") + 1),
-    );
-    if (!freshCustomEntries.has(m) && !exactCombo && !reserveProjection && !exactOpenCode) {
+    if (!freshCustomEntries.has(m) && !exactCombo && !reserveProjection && !String(e.slug ?? "").startsWith("opencode-go/")) {
       const levels = Array.isArray(e.supported_reasoning_levels)
         ? e.supported_reasoning_levels as Array<{ effort?: string }>
         : [];

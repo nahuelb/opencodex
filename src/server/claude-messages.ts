@@ -867,8 +867,8 @@ async function handleClaudeMessagesWithBudget(
       };
     }
   }
-  // Carry OpenCode identity out of band: a combo's preflight target may differ from its
-  // actual dispatch/fallback target. Never add OpenCode-only identity to replay headers.
+  // Carry Go identity out of band: a combo's preflight target may differ from its
+  // actual dispatch/fallback target. Never add Go-only identity to replay headers.
   const claudeNativeSessionId = cacheKeySource === "metadata"
     && typeof internalBody.prompt_cache_key === "string"
     && isRec(anthropicBody)
@@ -876,16 +876,14 @@ async function handleClaudeMessagesWithBudget(
     ? uuidFromHex(internalBody.prompt_cache_key)
     : undefined;
   const metadataGoLane = normalizeLogConversationId(claudeNativeSessionId);
-  // Real conversation identity only. Zen omits affinity when this is absent instead of
-  // grouping unrelated requests, so it stays separate from the allocated fallback below.
-  const claudeExplicitSessionLane = sessionLaneIdFromRequest(headers)
-    ?? normalizeLogConversationId(req.headers.get("x-opencode-session"))
-    ?? metadataGoLane;
   // Without any valid conversation identity, fall back to the request-scoped lane
   // allocated on the admitted client request (#4172): stable across retries and
   // route reconstruction, distinct per request, and never derived from a shared
   // system-prompt cache key or from a later synthesized native session_id header.
-  const claudeGoSessionLane = claudeExplicitSessionLane ?? getOrAllocateRequestSessionLane(req);
+  const claudeGoSessionLane = sessionLaneIdFromRequest(headers)
+    ?? normalizeLogConversationId(req.headers.get("x-opencode-session"))
+    ?? metadataGoLane
+    ?? getOrAllocateRequestSessionLane(req);
   let internalReq: Request;
   try {
     // The UTF-16 JSON string and the Request's UTF-8 body coexist until dispatch.
@@ -929,10 +927,7 @@ async function handleClaudeMessagesWithBudget(
     // Without this the replay would look native and a Responses-scoped wire default
     // would fire, disagreeing with the pre-flight decision above.
     inboundWire: "anthropic",
-    claudeGoAffinity: {
-      sessionLane: claudeGoSessionLane,
-      ...(claudeExplicitSessionLane ? { explicitSessionLane: claudeExplicitSessionLane } : {}),
-    },
+    claudeGoAffinity: { sessionLane: claudeGoSessionLane },
     claudeNativeSessionId,
     stripClaudeMainAuthForNoncanonicalForward: true,
     ...(trustedClaudeMainAuth ? { trustedClaudeMainAuth } : {}),
